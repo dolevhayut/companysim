@@ -93,7 +93,7 @@ async function main() {
   }
   if (v.help || !command) {
     out(
-      "CompanySim — Spin up an entire company on your machine.\nCommands: init, create, generate, serve, status, inspect, search, snapshot, branch, restore, reset, provider, doctor, export, import, mcp\nUse --data-dir PATH, --branch NAME, --json, --yes for automation. Native server defaults to 127.0.0.1:4545.\nEnrichment requires --provider, --model, --max-cost and --cost-per-job (approximate budget reservation).",
+      "CompanySim — Spin up an entire company on your machine.\nCommands: init, create, generate, serve, status, inspect, search, snapshot, scenario, branch, restore, reset, provider, doctor, export, import, mcp\nUse --data-dir PATH, --branch NAME, --json, --yes for automation. Native server defaults to 127.0.0.1:4545.\nEnrichment requires --provider, --model, --max-cost and --cost-per-job (approximate budget reservation).",
     );
     return;
   }
@@ -270,14 +270,11 @@ async function main() {
       process.exitCode = 1;
     return;
   }
-  const writer = [
-    "create",
-    "generate",
-    "snapshot",
-    "restore",
-    "reset",
-    "import",
-  ].includes(command);
+  const writer =
+    ["create", "generate", "snapshot", "restore", "reset", "import"].includes(
+      command,
+    ) ||
+    (command === "scenario" && ["apply", "run"].includes(p[1] ?? ""));
   const release = writer ? lock(dir) : () => {};
   const db = new Database(dir);
   const s = new Services(db, undefined, writer);
@@ -376,6 +373,32 @@ async function main() {
           : undefined;
         out(v.resume ? await s.resume(options) : await s.enrich(options));
         if (s.status().state !== "completed") process.exitCode = 7;
+        break;
+      }
+      case "scenario": {
+        const action = p[1] ?? "list";
+        if (action === "list") out(s.scenarios());
+        else if (action === "preview") out(s.scenarioPreview(p[2] ?? ""));
+        else if (action === "evaluate") out(s.evaluateScenario(p[2] ?? ""));
+        else if (action === "apply") out(s.applyScenario(p[2] ?? ""));
+        else if (["validate", "run"].includes(action)) {
+          const path = p[2] ?? "";
+          if (!existsSync(path))
+            throw new AppError(
+              "ENTITY_NOT_FOUND",
+              "Scenario pack was not found.",
+              404,
+            );
+          const content = readFileSync(path, "utf8");
+          const pack = /\.ya?ml$/i.test(path)
+            ? parse(content)
+            : JSON.parse(content);
+          out(
+            action === "validate"
+              ? s.validateScenarioPack(pack)
+              : s.applyScenarioPack(pack),
+          );
+        } else throw new AppError("VALIDATION", "Unknown scenario command.");
         break;
       }
       case "export": {

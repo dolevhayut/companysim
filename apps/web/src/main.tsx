@@ -1055,12 +1055,15 @@ function App() {
                 <>
                   <section className="scenario-intro">
                     <div>
-                      <span className="eyebrow">SAFE, REPEATABLE TEST CASES</span>
+                      <span className="eyebrow">
+                        SAFE, REPEATABLE TEST CASES
+                      </span>
                       <h2>Scenario Lab</h2>
                       <p>
-                        Apply a realistic change to this company, inspect the exact diff,
-                        then give an agent a grounded investigation prompt. Create a snapshot
-                        first if you want a one-click way back.
+                        Apply a realistic change to this company, inspect the
+                        exact diff, then give an agent a grounded investigation
+                        prompt. Create a snapshot first if you want a one-click
+                        way back.
                       </p>
                     </div>
                     <button onClick={() => setPage("Snapshots")}>
@@ -1084,13 +1087,17 @@ function App() {
                         <h3>{String(scenario.title)}</h3>
                         <p>{String(scenario.description)}</p>
                         <div className="scenario-card-footer">
-                          <span>{String(scenario.affectedCount)} connected records</span>
+                          <span>
+                            {String(scenario.affectedCount)} connected records
+                          </span>
                           <button
                             onClick={() =>
                               void guard(async () => {
                                 setScenarioPreview(
                                   await api<Row>(
-                                    "/api/control/scenarios/" + scenario.id + "/preview",
+                                    "/api/control/scenarios/" +
+                                      scenario.id +
+                                      "/preview",
                                   ),
                                 );
                                 setScenarioEvaluation(null);
@@ -1111,20 +1118,29 @@ function App() {
                           <h2>{String(scenarioPreview.title)}</h2>
                           <p>{String(scenarioPreview.description)}</p>
                         </div>
-                        <span className="badge">{String(scenarioPreview.focus)}</span>
+                        <span className="badge">
+                          {String(scenarioPreview.focus)}
+                        </span>
                       </div>
-                      <div className="scenario-diff" aria-label="Scenario changes">
-                        {((scenarioPreview.changes as Row[] | undefined) ?? []).map(
-                          (change, index) => (
-                            <div key={String(change.entityId ?? "event") + index}>
-                              <span>{String(change.entityType)}</span>
-                              <strong>{String(change.field)}</strong>
-                              <code>{change.before == null ? "new" : String(change.before)}</code>
-                              <ArrowRight size={14} aria-hidden="true" />
-                              <code>{String(change.after)}</code>
-                            </div>
-                          ),
-                        )}
+                      <div
+                        className="scenario-diff"
+                        aria-label="Scenario changes"
+                      >
+                        {(
+                          (scenarioPreview.changes as Row[] | undefined) ?? []
+                        ).map((change, index) => (
+                          <div key={String(change.entityId ?? "event") + index}>
+                            <span>{String(change.entityType)}</span>
+                            <strong>{String(change.field)}</strong>
+                            <code>
+                              {change.before == null
+                                ? "new"
+                                : String(change.before)}
+                            </code>
+                            <ArrowRight size={14} aria-hidden="true" />
+                            <code>{String(change.after)}</code>
+                          </div>
+                        ))}
                       </div>
                       <div className="actions">
                         <button
@@ -1138,7 +1154,9 @@ function App() {
                               action: "Apply scenario",
                               run: async () => {
                                 const result = await api<Row>(
-                                  "/api/control/scenarios/" + scenarioPreview.id + "/apply",
+                                  "/api/control/scenarios/" +
+                                    scenarioPreview.id +
+                                    "/apply",
                                   "POST",
                                 );
                                 setScenarioPreview(result);
@@ -1146,27 +1164,33 @@ function App() {
                                   "/api/control/scenarios",
                                 );
                                 setScenarioHistory(catalog.history);
-                                setNotice("Scenario applied. The change is now visible through REST and MCP.");
+                                setNotice(
+                                  "Scenario applied. The change is now visible through REST and MCP.",
+                                );
                                 await refresh();
                               },
                             })
                           }
                         >
-                          Apply to company <ArrowRight size={15} aria-hidden="true" />
+                          Apply to company{" "}
+                          <ArrowRight size={15} aria-hidden="true" />
                         </button>
                         <button
                           onClick={() =>
                             void guard(async () => {
                               setScenarioEvaluation(
                                 await api<Row>(
-                                  "/api/control/scenarios/" + scenarioPreview.id + "/evaluate",
+                                  "/api/control/scenarios/" +
+                                    scenarioPreview.id +
+                                    "/evaluate",
                                   "POST",
                                 ),
                               );
                             })
                           }
                         >
-                          <ClipboardCheck size={15} aria-hidden="true" /> Run readiness check
+                          <ClipboardCheck size={15} aria-hidden="true" /> Run
+                          readiness check
                         </button>
                       </div>
                     </section>
@@ -1177,11 +1201,14 @@ function App() {
                         <div>
                           <span className="eyebrow">AGENT RETRIEVAL CHECK</span>
                           <h2>
-                            {scenarioEvaluation.passed ? "Ready for an agent" : "Needs attention"}
+                            {scenarioEvaluation.passed
+                              ? "Ready for an agent"
+                              : "Needs attention"}
                           </h2>
                           <p>
-                            This local check verifies the scenario’s records can be resolved and
-                            retrieved. It does not run or score an external agent.
+                            This local check verifies the scenario’s records can
+                            be resolved and retrieved. It does not run or score
+                            an external agent.
                           </p>
                         </div>
                         {Boolean(scenarioEvaluation.passed) && (
@@ -1189,17 +1216,17 @@ function App() {
                         )}
                       </div>
                       <div className="evaluation-checks">
-                        {((scenarioEvaluation.checks as Row[] | undefined) ?? []).map(
-                          (check) => (
-                            <div key={String(check.id)}>
-                              <Check size={15} aria-hidden="true" />
-                              <span>
-                                <strong>{String(check.label)}</strong>
-                                <small>{String(check.detail)}</small>
-                              </span>
-                            </div>
-                          ),
-                        )}
+                        {(
+                          (scenarioEvaluation.checks as Row[] | undefined) ?? []
+                        ).map((check) => (
+                          <div key={String(check.id)}>
+                            <Check size={15} aria-hidden="true" />
+                            <span>
+                              <strong>{String(check.label)}</strong>
+                              <small>{String(check.detail)}</small>
+                            </span>
+                          </div>
+                        ))}
                       </div>
                       <button
                         onClick={() =>
@@ -1216,8 +1243,9 @@ function App() {
                       <button
                         onClick={() => {
                           const scenario = scenarioEvaluation.scenario as
-                            | Row
-                            | undefined;
+                            Row | undefined;
+                          const replayableScenario =
+                            scenarioPreview ?? scenario;
                           downloadText(
                             JSON.stringify(
                               {
@@ -1225,14 +1253,14 @@ function App() {
                                 exportedAt: new Date().toISOString(),
                                 purpose:
                                   "Read-only CompanySim agent evaluation fixture",
-                                scenario,
+                                scenario: replayableScenario,
                                 checks: scenarioEvaluation.checks,
                                 agentPrompt: scenarioEvaluation.agentPrompt,
                               },
                               null,
                               2,
                             ),
-                            `companysim-${String(scenario?.id ?? "scenario")}-test-pack.json`,
+                            `companysim-${String(replayableScenario?.id ?? "scenario")}-test-pack.json`,
                             "application/json",
                           );
                           setNotice("Scenario test pack downloaded.");
@@ -1249,11 +1277,13 @@ function App() {
                           <span className="eyebrow">RUN HISTORY</span>
                           <h2>Changes already in this company</h2>
                           <p>
-                            These scenario events persist with the company and are included in snapshots and exports.
+                            These scenario events persist with the company and
+                            are included in snapshots and exports.
                           </p>
                         </div>
                         <button onClick={() => setPage("Events")}>
-                          Open events <ArrowUpRight size={15} aria-hidden="true" />
+                          Open events{" "}
+                          <ArrowUpRight size={15} aria-hidden="true" />
                         </button>
                       </div>
                       <div className="scenario-history-list">
@@ -1262,15 +1292,27 @@ function App() {
                           .reverse()
                           .map((run) => (
                             <div key={String(run.id)}>
-                              <span className="scenario-icon" aria-hidden="true">
+                              <span
+                                className="scenario-icon"
+                                aria-hidden="true"
+                              >
                                 <Check size={16} />
                               </span>
                               <span>
                                 <strong>{String(run.title)}</strong>
-                                <small>{String(run.affectedIds instanceof Array ? run.affectedIds.length : 0)} records changed</small>
+                                <small>
+                                  {String(
+                                    run.affectedIds instanceof Array
+                                      ? run.affectedIds.length
+                                      : 0,
+                                  )}{" "}
+                                  records changed
+                                </small>
                               </span>
                               <time dateTime={String(run.appliedAt)}>
-                                {new Date(String(run.appliedAt)).toLocaleString()}
+                                {new Date(
+                                  String(run.appliedAt),
+                                ).toLocaleString()}
                               </time>
                             </div>
                           ))}

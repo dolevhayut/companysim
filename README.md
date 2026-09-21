@@ -128,6 +128,15 @@ pnpm company branch delete pr-184 --yes
 
 The branch starts from a consistent SQLite backup of main and then evolves independently. Every existing command accepts `--branch NAME`, including `serve`, `mcp`, `status`, scenarios, snapshots and enrichment. Branches do not copy provider credentials or main-company snapshot files.
 
+The JSON test pack downloaded from Scenario Lab is executable through the CLI:
+
+```sh
+pnpm company scenario validate ./companysim-delivery-risk-test-pack.json --branch pr-184
+pnpm company scenario run ./companysim-delivery-risk-test-pack.json --branch pr-184
+```
+
+Validation checks that every target still exists and matches the baseline captured in the pack. A stale pack fails before any changes are written. Packs can therefore live beside tests in Git and run against short-lived branches in CI.
+
 ## REST and MCP
 
 - REST: `http://localhost:4545/api/v1`

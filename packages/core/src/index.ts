@@ -33,11 +33,15 @@ export interface Progress {
   error?: string;
   reservedCostUsd?: number;
 }
-const scenarioIds = ["delivery-risk", "renewal-risk", "security-review"] as const;
+const scenarioIds = [
+  "delivery-risk",
+  "renewal-risk",
+  "security-review",
+] as const;
 type ScenarioId = (typeof scenarioIds)[number];
 type ScenarioHistory = {
   id: string;
-  scenarioId: ScenarioId;
+  scenarioId: string;
   title: string;
   appliedAt: string;
   affectedIds: string[];
@@ -49,6 +53,59 @@ type ScenarioChange = {
   before: unknown;
   after: unknown;
 };
+const scenarioPackSchema = z
+  .object({
+    formatVersion: z.literal(1),
+    exportedAt: z.iso.datetime(),
+    purpose: z.string().min(1).max(200),
+    scenario: z.object({
+      id: z.string().min(1).max(100),
+      title: z.string().min(1).max(300),
+      description: z.string().max(2000),
+      focus: z.string().max(200),
+      targets: z.array(entitySchema).max(100),
+      changes: z
+        .array(
+          z
+            .object({
+              entityId: z.string().optional(),
+              entityType: z.string(),
+              field: z.enum(["status", "priority", "health", "eventType"]),
+              before: z.unknown(),
+              after: z.union([z.string(), z.number(), z.boolean(), z.null()]),
+            })
+            .strict()
+            .superRefine((change, ctx) => {
+              if (
+                change.entityId &&
+                !["status", "priority", "health"].includes(change.field)
+              )
+                ctx.addIssue({
+                  code: "custom",
+                  path: ["field"],
+                  message: "Unsupported writable scenario field.",
+                });
+              if (
+                !change.entityId &&
+                !(
+                  change.entityType === "event" &&
+                  change.field === "eventType" &&
+                  change.after === "scenario_applied"
+                )
+              )
+                ctx.addIssue({
+                  code: "custom",
+                  message: "Only the scenario_applied event may omit entityId.",
+                });
+            }),
+        )
+        .min(1)
+        .max(100),
+    }),
+    checks: z.array(z.record(z.string(), z.unknown())).max(100),
+    agentPrompt: z.string().min(1).max(30000),
+  })
+  .strict();
 function projectChange(
   entity: Entity | undefined,
   field: "status" | "priority",
@@ -453,7 +510,7 @@ export class Services {
           .array(
             z.object({
               id: z.string(),
-              scenarioId: z.enum(scenarioIds),
+              scenarioId: z.string().min(1).max(100),
               title: z.string(),
               appliedAt: z.string(),
               affectedIds: z.array(z.string()),
@@ -584,8 +641,8 @@ export class Services {
       ? this.db.get(project.customerId)
       : this.db.all("customer")[0];
     const ticket = project
-      ? this.db.all("ticket").find((item) => item.projectId === project.id) ??
-        this.db.all("ticket")[0]
+      ? (this.db.all("ticket").find((item) => item.projectId === project.id) ??
+        this.db.all("ticket")[0])
       : this.db.all("ticket")[0];
     return { project, customer, ticket };
   }
@@ -594,20 +651,26 @@ export class Services {
       throw new AppError("ENTITY_NOT_FOUND", "Scenario was not found.", 404);
     const targets = this.scenarioTargets();
     const all = Object.values(targets).filter(Boolean) as Entity[];
-    const data: Record<ScenarioId, { title: string; description: string; focus: string }> = {
+    const data: Record<
+      ScenarioId,
+      { title: string; description: string; focus: string }
+    > = {
       "delivery-risk": {
         title: "Delivery risk",
-        description: "A project is slipping and needs a connected customer, owner and support trail.",
+        description:
+          "A project is slipping and needs a connected customer, owner and support trail.",
         focus: "project delivery",
       },
       "renewal-risk": {
         title: "Renewal at risk",
-        description: "A customer’s renewal needs context across its account, projects and tickets.",
+        description:
+          "A customer’s renewal needs context across its account, projects and tickets.",
         focus: "customer health",
       },
       "security-review": {
         title: "Security review",
-        description: "A priority support issue requires an agent to retrieve the relevant company context.",
+        description:
+          "A priority support issue requires an agent to retrieve the relevant company context.",
         focus: "support triage",
       },
     };
@@ -620,7 +683,12 @@ export class Services {
               ...projectChange(targets.ticket, "priority", "urgent"),
               ...projectChange(targets.ticket, "status", "open"),
             ];
-    return { id: id as ScenarioId, ...data[id as ScenarioId], targets: all, changes };
+    return {
+      id: id as ScenarioId,
+      ...data[id as ScenarioId],
+      targets: all,
+      changes,
+    };
   }
   scenarios() {
     this.company();
@@ -645,25 +713,100 @@ export class Services {
       ...scenario,
       changes: [
         ...scenario.changes,
-        { entityType: "event", field: "eventType", before: null, after: "scenario_applied" },
+        {
+          entityType: "event",
+          field: "eventType",
+          before: null,
+          after: "scenario_applied",
+        },
       ],
     };
   }
   applyScenario(id: string) {
     this.assertIdle();
     const preview = this.scenarioPreview(id);
+    const result = this.commitScenario(
+      preview.id,
+      preview.title,
+      preview.targets,
+      preview.changes,
+    );
+    return { ...this.scenarioPreview(id), applied: true, runId: result.runId };
+  }
+  validateScenarioPack(input: unknown) {
+    this.company();
+    const pack = scenarioPackSchema.parse(input);
+    for (const change of pack.scenario.changes) {
+      if (!change.entityId) continue;
+      const entity = this.db.get(change.entityId);
+      if (!entity || entity.type !== change.entityType)
+        throw new AppError(
+          "ENTITY_NOT_FOUND",
+          `Scenario target ${change.entityId} was not found.`,
+          404,
+        );
+      if (
+        JSON.stringify(entity[change.field]) !== JSON.stringify(change.before)
+      )
+        throw new AppError(
+          "CONFLICT",
+          `Scenario target ${change.entityId}.${change.field} no longer matches the pack baseline.`,
+          409,
+        );
+    }
+    return {
+      valid: true,
+      scenarioId: pack.scenario.id,
+      title: pack.scenario.title,
+      changeCount: pack.scenario.changes.filter((change) => change.entityId)
+        .length,
+      targetIds: pack.scenario.targets.map((target) => target.id),
+      pack,
+    };
+  }
+  applyScenarioPack(input: unknown) {
+    this.assertIdle();
+    const validated = this.validateScenarioPack(input);
+    const result = this.commitScenario(
+      validated.pack.scenario.id,
+      validated.pack.scenario.title,
+      validated.pack.scenario.targets,
+      validated.pack.scenario.changes,
+    );
+    return { ...validated, applied: true, runId: result.runId };
+  }
+  private commitScenario(
+    scenarioId: string,
+    title: string,
+    targets: Entity[],
+    changes: ScenarioChange[],
+  ) {
     const now = new Date().toISOString();
     const history = this.db.meta<ScenarioHistory[]>("scenarioHistory") ?? [];
-    const runId = `scenario_${preview.id.replace(/-/g, "_")}_${history.length + 1}`;
+    const slug = scenarioId
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 60);
+    let sequence = history.length + 1;
+    let runId = `scenario_${slug || "pack"}_${sequence}`;
+    while (this.db.get(runId)) {
+      sequence++;
+      runId = `scenario_${slug || "pack"}_${sequence}`;
+    }
     this.db.transaction(() => {
-      for (const change of preview.changes) {
+      for (const change of changes) {
         if (!change.entityId) continue;
         const entity = this.db.get(change.entityId)!;
         this.db.put({
           ...entity,
           [change.field]: change.after,
           updatedAt: now,
-          metadata: { ...entity.metadata, scenario: preview.id, scenarioAppliedAt: now },
+          metadata: {
+            ...entity.metadata,
+            scenario: scenarioId,
+            scenarioAppliedAt: now,
+          },
         } as Entity);
       }
       this.db.put({
@@ -675,14 +818,24 @@ export class Services {
         occurredAt: now,
         actorType: "company",
         actorId: this.company().id,
-        payload: { scenarioId: preview.id, title: preview.title, affectedIds: preview.targets.map((item) => item.id) },
+        payload: {
+          scenarioId,
+          title,
+          affectedIds: targets.map((item) => item.id),
+        },
       });
       this.db.setMeta("scenarioHistory", [
         ...history,
-        { id: runId, scenarioId: preview.id, title: preview.title, appliedAt: now, affectedIds: preview.targets.map((item) => item.id) },
+        {
+          id: runId,
+          scenarioId,
+          title,
+          appliedAt: now,
+          affectedIds: targets.map((item) => item.id),
+        },
       ]);
     });
-    return { ...this.scenarioPreview(id), applied: true, runId };
+    return { applied: true, runId };
   }
   evaluateScenario(id: string) {
     const preview = this.scenarioPreview(id);
@@ -691,12 +844,32 @@ export class Services {
       ? this.search({ query: first.name ?? first.title ?? first.id }).results
       : [];
     const checks = [
-      { id: "targets", label: "Scenario targets resolve", passed: preview.targets.length > 0, detail: `${preview.targets.length} connected records available.` },
-      { id: "search", label: "Search returns scenario context", passed: searchable.length > 0, detail: `${searchable.length} result${searchable.length === 1 ? "" : "s"} returned for the primary target.` },
-      { id: "relationships", label: "Connected context is present", passed: preview.targets.length >= 2, detail: `${preview.targets.length} records can be inspected through REST or MCP.` },
+      {
+        id: "targets",
+        label: "Scenario targets resolve",
+        passed: preview.targets.length > 0,
+        detail: `${preview.targets.length} connected records available.`,
+      },
+      {
+        id: "search",
+        label: "Search returns scenario context",
+        passed: searchable.length > 0,
+        detail: `${searchable.length} result${searchable.length === 1 ? "" : "s"} returned for the primary target.`,
+      },
+      {
+        id: "relationships",
+        label: "Connected context is present",
+        passed: preview.targets.length >= 2,
+        detail: `${preview.targets.length} records can be inspected through REST or MCP.`,
+      },
     ];
     const prompt = `Use the CompanySim MCP server to investigate the ${preview.title.toLowerCase()} scenario. Start by calling get_company and search_company for ${JSON.stringify(first?.name ?? first?.title ?? first?.id ?? "the scenario target")}. Then inspect every returned project, customer, ticket and person that is relevant. Give a concise risk summary, cite the entity IDs used, and recommend the next action. Do not mutate, reset, restore or enrich the company.`;
-    return { scenario: preview, checks, passed: checks.every((check) => check.passed), agentPrompt: prompt };
+    return {
+      scenario: preview,
+      checks,
+      passed: checks.every((check) => check.passed),
+      agentPrompt: prompt,
+    };
   }
   reset() {
     this.assertIdle();

@@ -164,6 +164,24 @@ consistent main-company state. Branch metadata records the source company and
 canonical hash. Provider credentials and main-company snapshots are not
 copied. Deleting a branch must fail while its runtime holds the branch lock.
 
+### `company scenario`
+
+Inspect or apply built-in scenarios, and validate or execute a downloaded
+scenario test pack:
+
+```bash
+company scenario list
+company scenario preview delivery-risk --json
+company scenario evaluate delivery-risk --json
+company scenario apply delivery-risk --branch agent-run
+company scenario validate ./companysim-delivery-risk-test-pack.json --branch agent-run
+company scenario run ./companysim-delivery-risk-test-pack.json --branch agent-run
+```
+
+`validate` resolves every target and checks its expected baseline value.
+`run` refuses stale packs instead of silently overwriting changed state. JSON
+and YAML packs are accepted. Run packs on an isolated branch when possible.
+
 ### `company reset`
 
 ```bash

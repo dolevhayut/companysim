@@ -12,6 +12,7 @@
 - Environment keys take precedence over in-memory session keys. Provider errors deliberately discard upstream text. Provider-generated prose is redacted before storage.
 - No production registry image or npm package is published. Docker quickstart builds a local image. The source directory initially had no Git repository, so no commits are invented.
 - Company branches live under `<data-dir>/branches/<name>` and are created with Node's SQLite online backup API. Each has an independent database and runtime lock plus a small manifest containing its source company and canonical entity hash. Snapshots remain local to their environment, and in-memory provider credentials are never copied. Branch deletion validates names, rejects symlinks and refuses to proceed while the branch runtime is active.
+- Scenario test packs are portable JSON/YAML artifacts containing exact target IDs, before/after values, retrieval checks and an agent prompt. The first pack format intentionally allows writes only to status, priority and health plus one generated `scenario_applied` event. Validation checks every baseline before the transaction, preventing a stale pack from partially mutating a company. Exact-ID packs replay across clones of the same deterministic company; selector-based cross-seed packs remain future work.
 
 ## Acceptance evidence
 

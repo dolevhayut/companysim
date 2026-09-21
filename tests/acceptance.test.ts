@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { mkdtempSync, rmSync, readFileSync } from "node:fs";
+import { mkdtempSync, rmSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -160,12 +160,22 @@ describe("CompanySim public alpha acceptance", () => {
     expect(
       preview.changes.some((change: { entityId?: string }) => change.entityId),
     ).toBe(true);
+    const pack = {
+      formatVersion: 1,
+      exportedAt: new Date().toISOString(),
+      purpose: "Read-only CompanySim agent evaluation fixture",
+      scenario: preview,
+      checks: [],
+      agentPrompt: "Investigate this scenario through CompanySim MCP.",
+    };
+    expect(s.validateScenarioPack(pack).valid).toBe(true);
     const applied = await (
       await app.request("/api/control/scenarios/delivery-risk/apply", {
         method: "POST",
       })
     ).json();
     expect(applied.applied).toBe(true);
+    expect(() => s.applyScenarioPack(pack)).toThrow("no longer matches");
     expect(s.db.get(applied.runId)?.type).toBe("event");
     const evaluation = await (
       await app.request("/api/control/scenarios/delivery-risk/evaluate", {
@@ -278,6 +288,48 @@ describe("CompanySim public alpha acceptance", () => {
     expect(JSON.parse(cli("status", "--json").stdout).company.name).toBe(
       "testco",
     );
+    const evaluated = JSON.parse(
+      cli(
+        "scenario",
+        "evaluate",
+        "delivery-risk",
+        "--branch",
+        "agent-run",
+        "--json",
+      ).stdout,
+    );
+    const packPath = join(dir, "delivery-risk.pack.json");
+    writeFileSync(
+      packPath,
+      JSON.stringify({
+        formatVersion: 1,
+        exportedAt: new Date().toISOString(),
+        purpose: "Read-only CompanySim agent evaluation fixture",
+        scenario: evaluated.scenario,
+        checks: evaluated.checks,
+        agentPrompt: evaluated.agentPrompt,
+      }),
+    );
+    expect(
+      JSON.parse(
+        cli("scenario", "validate", packPath, "--branch", "agent-run", "--json")
+          .stdout,
+      ).valid,
+    ).toBe(true);
+    expect(
+      JSON.parse(
+        cli("scenario", "run", packPath, "--branch", "agent-run", "--json")
+          .stdout,
+      ).applied,
+    ).toBe(true);
+    expect(
+      JSON.parse(
+        cli("scenario", "list", "--branch", "agent-run", "--json").stdout,
+      ).history,
+    ).toHaveLength(1);
+    expect(
+      JSON.parse(cli("scenario", "list", "--json").stdout).history,
+    ).toHaveLength(0);
     const releaseBranch = lock(join(dir, "branches", "agent-run"));
     try {
       expect(

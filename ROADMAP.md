@@ -55,6 +55,11 @@ deferred while the current local workflow is being validated.
 
 ### Scenario packs as code
 
+Status: JSON/YAML packs exported by Scenario Lab can now be validated and run
+through the CLI on any matching company or isolated branch. Baseline checks
+reject stale packs before mutation. The next iteration should add reusable
+selector-based packs that can target different seeds.
+
 Version scenario packs in Git. A pack should contain a deterministic seed,
 scenario inputs, expected facts, assertions and an agent task prompt.
 
