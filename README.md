@@ -58,6 +58,8 @@ Then ask:
 
 > Use CompanySim to summarize the company. Find a project, identify the people and customer connected to it, and show the documents that support your answer. Cite the entity IDs.
 
+> **Tested on a separate machine:** We installed the [Employee001](https://github.com/dolevhayut/Employee001) agent library on another machine and connected its agents to CompanySim through MCP. They could talk to the synthetic company seamlessly, navigating the same people, projects, customers and supporting records with consistent IDs and relationships.
+
 The Developer screen also includes Claude Code configuration, a downloadable `SKILL.md`, and connection troubleshooting. MCP tools are read-only. A cloud agent cannot reach your machine's localhost directly.
 
 ## Scenario Lab
