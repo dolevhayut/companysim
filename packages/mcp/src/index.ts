@@ -41,6 +41,11 @@ export function createMcp(services: Services) {
     );
   register("get_company", z.object({}), () => services.company());
   register("get_company_stats", z.object({}), () => services.stats());
+  register(
+    "get_company_entry_points",
+    z.object({ actorId: z.string().optional() }),
+    (input) => services.entryPoints(input.actorId as string | undefined),
+  );
   register("search_company", searchSchema, (input) => services.search(input));
   const names: Record<string, EntityType> = {
     find_people: "person",
@@ -70,7 +75,19 @@ export function createMcp(services: Services) {
       z.object({
         [type + "Id"]: z.string(),
         actorId: z.string().optional(),
-        include: z.array(z.enum(["relationships", "projects"])).optional(),
+        include: z
+          .array(
+            z.enum([
+              "relationships",
+              "projects",
+              "people",
+              "documents",
+              "messages",
+              "tickets",
+              "members",
+            ]),
+          )
+          .optional(),
       }),
       (input) => {
         const e = services.get(
@@ -79,29 +96,27 @@ export function createMcp(services: Services) {
           input.actorId as string | undefined,
         );
         const include = input.include as string[] | undefined;
-        return {
-          ...e,
-          ...(include?.includes("relationships")
-            ? {
-                relationships: services.related(
-                  type,
-                  e.id,
-                  "relationship",
-                  input.actorId as string | undefined,
-                ),
-              }
-            : {}),
-          ...(include?.includes("projects")
-            ? {
-                projects: services.related(
-                  type,
-                  e.id,
-                  "project",
-                  input.actorId as string | undefined,
-                ),
-              }
-            : {}),
+        const targetTypes: Record<string, EntityType> = {
+          relationships: "relationship",
+          projects: "project",
+          people: "person",
+          documents: "document",
+          messages: "message",
+          tickets: "ticket",
+          members: "person",
         };
+        return Object.fromEntries([
+          ...Object.entries(e),
+          ...(include ?? []).map((name) => [
+            name,
+            services.related(
+              type,
+              e.id,
+              targetTypes[name],
+              input.actorId as string | undefined,
+            ),
+          ]),
+        ]);
       },
     );
   return server;

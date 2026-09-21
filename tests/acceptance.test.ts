@@ -47,6 +47,31 @@ describe("CompanySim public alpha acceptance", () => {
         validate(generate({ employees: 1 + i * 3, seed: i }).entities),
       ).toEqual([]);
     expect(new Set(a.entities.map((e) => e.type)).size).toBe(21);
+    const messages = a.entities.filter((e) => e.type === "message");
+    expect(new Set(messages.map((e) => e.timestamp)).size).toBeGreaterThan(20);
+    expect(
+      Math.max(...messages.map((e) => Date.parse(e.timestamp!))),
+    ).toBeGreaterThan(Date.parse(a.config.asOf) - 120 * 86400000);
+    const customers = a.entities.filter((e) => e.type === "customer");
+    expect(customers.some((e) => e.renewalDate! < a.config.asOf)).toBe(true);
+    expect(customers.some((e) => e.renewalDate! > a.config.asOf)).toBe(true);
+    expect(new Set(customers.map((e) => e.health)).size).toBeGreaterThan(5);
+    expect(new Set(customers.map((e) => e.annualValue)).size).toBeGreaterThan(
+      5,
+    );
+    expect(
+      new Set(
+        a.entities.filter((e) => e.type === "project").map((e) => e.status),
+      ).size,
+    ).toBeGreaterThan(3);
+    expect(
+      new Set(
+        a.entities.filter((e) => e.type === "event").map((e) => e.subjectType),
+      ).size,
+    ).toBeGreaterThan(3);
+    expect(new Set(a.entities.map((e) => e.updatedAt)).size).toBeGreaterThan(
+      50,
+    );
   });
   it("C D M: migration, references, persistence and exact snapshot recovery", () => {
     const s = service();
@@ -89,7 +114,7 @@ describe("CompanySim public alpha acceptance", () => {
   });
   it("D E U V: REST pagination, filtering, access, search, errors, schema and origin protection", async () => {
     const s = service();
-    s.create({ employees: 50 });
+    s.create({ employees: 250 });
     const app = createRest(s);
     const response = await app.request("/api/v1/people?limit=5");
     expect(response.status).toBe(200);
@@ -99,6 +124,13 @@ describe("CompanySim public alpha acceptance", () => {
       await app.request("/api/v1/people?limit=5&cursor=" + p.nextCursor)
     ).json();
     expect(next.items[0].id).not.toBe(p.items[0].id);
+    const maxPage = await (
+      await app.request("/api/v1/people?limit=200")
+    ).json();
+    expect(maxPage.items).toHaveLength(200);
+    expect(maxPage.hasMore).toBe(true);
+    expect((await app.request("/api/v1/people?limit=0")).status).toBe(400);
+    expect((await app.request("/api/v1/people?limit=201")).status).toBe(400);
     expect((await app.request("/api/v1/people?limit=-1")).status).toBe(400);
     expect((await app.request("/api/v1/people/missing")).status).toBe(404);
     const person = await (
@@ -147,6 +179,27 @@ describe("CompanySim public alpha acceptance", () => {
     const schema = await (await app.request("/openapi.json")).json();
     expect(schema.openapi).toBe("3.1.0");
     expect(schema.paths["/api/v1/people/{id}"]).toBeDefined();
+    expect(Object.keys(schema.components.schemas).length).toBeGreaterThan(20);
+    expect(
+      schema.paths["/api/v1/people"].get.parameters.some(
+        (parameter: { name: string }) => parameter.name === "cursor",
+      ),
+    ).toBe(true);
+    expect(
+      schema.paths["/api/v1/people/{id}"].get.responses[200].content[
+        "application/json"
+      ].schema.$ref,
+    ).toBe("#/components/schemas/Person");
+    const getSearch = await app.request(
+      "/api/v1/search?query=Atlas%20Migration&types=project,document",
+    );
+    expect(getSearch.status).toBe(200);
+    expect((await getSearch.json()).results.length).toBeGreaterThan(0);
+    expect(s.stats().simulation.asOf).toBeTruthy();
+    expect(
+      (await (await app.request("/api/v1/entry-points")).json()).activeProjects
+        .length,
+    ).toBeGreaterThan(0);
   });
   it("Scenario Lab changes the shared company state and exposes a retrieval-ready evaluation", async () => {
     const s = service();
@@ -202,7 +255,7 @@ describe("CompanySim public alpha acceptance", () => {
       await client.connect(
         new StreamableHTTPClientTransport(new URL(base + "/mcp")),
       );
-      expect((await client.listTools()).tools).toHaveLength(20);
+      expect((await client.listTools()).tools).toHaveLength(21);
       const company = await client.callTool({
         name: "get_company",
         arguments: {},
@@ -221,6 +274,28 @@ describe("CompanySim public alpha acceptance", () => {
       expect(
         JSON.parse((person.content as { text: string }[])[0].text),
       ).toEqual(await (await fetch(base + "/api/v1/people/" + id)).json());
+      const project = runtime.services.list("project").items[0];
+      const projectWithDocuments = await client.callTool({
+        name: "get_project",
+        arguments: { projectId: project.id, include: ["documents", "people"] },
+      });
+      const expanded = JSON.parse(
+        (projectWithDocuments.content as { text: string }[])[0].text,
+      );
+      expect(expanded.documents).toEqual(
+        await (
+          await fetch(base + `/api/v1/projects/${project.id}/documents`)
+        ).json(),
+      );
+      expect(expanded.people.items.length).toBeGreaterThan(0);
+      const entryPoints = await client.callTool({
+        name: "get_company_entry_points",
+        arguments: {},
+      });
+      expect(
+        JSON.parse((entryPoints.content as { text: string }[])[0].text)
+          .activeProjects.length,
+      ).toBeGreaterThan(0);
       expect(
         (
           await client.callTool({
@@ -256,6 +331,8 @@ describe("CompanySim public alpha acceptance", () => {
       "50",
       "--seed",
       "42",
+      "--now",
+      "2026-09-21T00:00:00.000Z",
       "--yes",
       "--json",
     );
@@ -263,6 +340,9 @@ describe("CompanySim public alpha acceptance", () => {
     expect(JSON.parse(create.stdout).name).toBe("testco");
     const status = cli("status", "--json");
     expect(JSON.parse(status.stdout).counts.person).toBe(50);
+    expect(JSON.parse(status.stdout).counts.simulation.asOf).toBe(
+      "2026-09-21T00:00:00.000Z",
+    );
     const branch = cli("branch", "create", "agent-run", "--json");
     expect(branch.status, branch.stderr).toBe(0);
     expect(JSON.parse(branch.stdout).name).toBe("agent-run");
@@ -475,6 +555,11 @@ describe("CompanySim public alpha acceptance", () => {
     await s.resume({ ...opts, provider: "anthropic", maxCostUsd: 1 });
     expect(s.status().state).toBe("completed");
     expect(s.validate().invalidReferences).toEqual([]);
+    for (const entity of s.db.all()) {
+      expect(entity.metadata ?? {}).not.toHaveProperty("provider");
+      expect(entity.metadata ?? {}).not.toHaveProperty("model");
+      expect(entity.metadata ?? {}).not.toHaveProperty("contentJobId");
+    }
     s.snapshot("safe");
     const exported = JSON.stringify(s.export());
     expect(exported).not.toContain("sk-secret");

@@ -96,6 +96,7 @@ function App() {
     industry: "saas",
     employees: 100,
     historyYears: 5,
+    asOf: new Date().toISOString().slice(0, 10) + "T00:00:00.000Z",
     regions: ["US"],
     seed: "42",
     density: "low",
@@ -539,6 +540,19 @@ function App() {
                             />
                           </label>
                           <label>
+                            Simulation date
+                            <input
+                              type="date"
+                              value={config.asOf.slice(0, 10)}
+                              onChange={(e) =>
+                                setConfig({
+                                  ...config,
+                                  asOf: e.target.value + "T00:00:00.000Z",
+                                })
+                              }
+                            />
+                          </label>
+                          <label>
                             Region
                             <input
                               value={config.regions[0]}
@@ -828,6 +842,14 @@ function App() {
                       <div className="environment-row">
                         <span>Agent access</span>
                         <strong>HTTP + stdio</strong>
+                      </div>
+                      <div className="environment-row">
+                        <span>Simulation date</span>
+                        <strong>
+                          {String(
+                            (stats.simulation as Row | undefined)?.asOf ?? "",
+                          ).slice(0, 10)}
+                        </strong>
                       </div>
                       <div className="environment-row">
                         <span>Data ownership</span>
@@ -1471,7 +1493,7 @@ function App() {
                       }}
                     />
                   </label>
-                  <p>Version 0.1.0-alpha.1 · SQLite · Local-only defaults</p>
+                  <p>Version 0.1.0-alpha.2 · SQLite · Local-only defaults</p>
                 </section>
               )}
             </>

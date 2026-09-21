@@ -31,6 +31,7 @@ import {
   safeError,
   AppError,
   VERSION,
+  GENERATOR_VERSION,
 } from "../../schema/src/index.js";
 const stringFlags = [
   "config",
@@ -38,6 +39,8 @@ const stringFlags = [
   "industry",
   "employees",
   "history",
+  "as-of",
+  "now",
   "seed",
   "mode",
   "density",
@@ -93,7 +96,7 @@ async function main() {
   }
   if (v.help || !command) {
     out(
-      "CompanySim — Spin up an entire company on your machine.\nCommands: init, create, generate, serve, status, inspect, search, snapshot, scenario, eval, branch, restore, reset, provider, doctor, export, import, mcp\nUse --data-dir PATH, --branch NAME, --json, --yes for automation. Native server defaults to 127.0.0.1:4545.\nEnrichment requires --provider, --model, --max-cost and --cost-per-job (approximate budget reservation).",
+      "CompanySim — Spin up an entire company on your machine.\nCommands: init, create, generate, serve, status, inspect, search, snapshot, scenario, eval, branch, restore, reset, provider, doctor, export, import, mcp\nUse --data-dir PATH, --branch NAME, --json, --yes for automation. Set simulation time during create with --now ISO_DATE_TIME (or --as-of). Native server defaults to 127.0.0.1:4545.\nEnrichment requires --provider, --model, --max-cost and --cost-per-job (approximate budget reservation).",
     );
     return;
   }
@@ -301,6 +304,9 @@ async function main() {
           ...(text("history")
             ? { historyYears: Number(text("history")!.replace(/y$/, "")) }
             : {}),
+          ...((text("as-of") ?? text("now"))
+            ? { asOf: text("as-of") ?? text("now") }
+            : {}),
         });
         if (v.force) await confirm("Replace existing company?");
         out(s.create(config, !!v.force));
@@ -458,7 +464,7 @@ async function main() {
             out(
               s.import({
                 formatVersion: 1,
-                generatorVersion: 1,
+                generatorVersion: GENERATOR_VERSION,
                 config: JSON.parse(
                   String(
                     imported

@@ -32,6 +32,7 @@ Initial tools:
 ```text
 get_company
 get_company_stats
+get_company_entry_points
 find_people
 get_person
 find_teams
@@ -94,6 +95,10 @@ Input schema concept:
 
 Returns lightweight person summaries.
 
+`get_company_entry_points` returns a bounded first set of active projects,
+at-risk customers and key people, plus the simulation date. Agents can use it
+as their first domain read when they do not yet have search terms or IDs.
+
 ## 7. `get_person`
 
 Input:
@@ -101,11 +106,17 @@ Input:
 ```json
 {
   "personId": "person_123",
-  "include": ["relationships", "projects"]
+  "include": ["relationships", "projects", "documents", "messages"]
 }
 ```
 
 Do not return every associated message/document by default.
+
+Entity getters support bounded relationship expansion through `include`.
+Available expansions are `relationships`, `projects`, `people`, `documents`,
+`messages`, `tickets` and `members`. This mirrors the REST scoped sub-resources;
+for example, `get_project({projectId, include:["documents","people"]})` returns
+the same collections as `/projects/{id}/documents` and `/projects/{id}/people`.
 
 ## 8. `search_company`
 

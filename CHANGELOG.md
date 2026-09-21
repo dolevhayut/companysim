@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.0-alpha.2
+
+- Reworked deterministic generation around an explicit simulation date. Messages, conversations, lifecycle timestamps and events now span the simulation window; renewal and project targets cover overdue, imminent and future buckets.
+- Added realistic deterministic distributions for customer value/health, project/task/ticket states, child counts, entity names, contacts and internal tools. Generator version 2 keeps version 1 exports importable.
+- Added `get_company_entry_points` and REST `/api/v1/entry-points`, plus MCP entity expansion for documents, people, messages, tickets and members so scoped traversal matches REST.
+- Added read-only `GET /api/v1/search`, retained POST search, exposed `simulation.asOf` in stats, and added `--now` / `--as-of` plus the setup date control.
+- Added concrete OpenAPI entity/search/list schemas and pagination parameters. Regression coverage now verifies limits 0, 200 and 201.
+- Removed provider/model/job provenance from enriched entity metadata; provider credentials and generation internals remain outside domain records.
+
 ## 0.1.0-alpha.1
 
 Initial local runtime: deterministic company generation, SQLite/FTS5 persistence, shared services, REST and OpenAPI, official SDK MCP HTTP/stdio, CLI lifecycle, React control panel, snapshots and exports, optional OpenAI/Anthropic enrichment with persisted jobs and approximate budget reservations, Docker packaging and acceptance tests.

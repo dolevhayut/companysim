@@ -85,7 +85,7 @@ corepack enable
 corepack prepare pnpm@10.32.1 --activate
 pnpm install --frozen-lockfile
 pnpm check
-pnpm company create acme --employees 100 --seed 42 --yes --data-dir ./company-data
+pnpm company create acme --employees 100 --seed 42 --now 2026-09-21T00:00:00.000Z --yes --data-dir ./company-data
 pnpm dev --data-dir ./company-data
 ```
 
@@ -111,7 +111,7 @@ pnpm company reset --yes
 
 Use `--data-dir PATH` on every command to target an explicit environment. Defaults to `~/.local/share/companysim`, or `COMPANYSIM_DATA_DIR`. YAML configuration follows `companysim.example.yaml`. `--config` selects a file. `--history 5y`, `--density low|medium|high` and `--force` are supported.
 
-After `pnpm build`, `npm pack` creates an installable CLI package with `company` and `companysim` aliases. Install the tarball with `npm install -g ./companysim-0.1.0-alpha.1.tgz`.
+After `pnpm build`, `npm pack` creates an installable CLI package with `company` and `companysim` aliases. Install the tarball with `npm install -g ./companysim-0.1.0-alpha.2.tgz`.
 
 JSON is the complete, versioned, round-trip export (including job progress); SQLite export is also importable. JSONL and CSV exports contain entity rows for analysis, not full environment backups.
 
@@ -157,6 +157,9 @@ The scorecard is deterministic: it verifies scenario state, required company/sea
 ```sh
 curl http://localhost:4545/api/v1/people?limit=5
 curl -H 'Content-Type: application/json' -d '{"query":"Atlas Migration"}' http://localhost:4545/api/v1/search
+
+# Equivalent read-only GET search
+curl 'http://localhost:4545/api/v1/search?query=Atlas%20Migration&types=project,document'
 ```
 
 MCP configuration:
@@ -165,7 +168,7 @@ MCP configuration:
 {"mcpServers":{"companysim":{"url":"http://localhost:4545/mcp"}}}
 ```
 
-The official MCP SDK implements both transports. All tools are read-only. REST list endpoints use opaque keyset cursors. Search uses SQLite FTS5 BM25 (lower is more relevant), then one-hop relationships; expanded entities have score zero. No LLM is called for search.
+The official MCP SDK implements both transports. All tools are read-only. Start an open-ended agent investigation with `get_company_entry_points`; expand a known project with `get_project({ projectId, include: ["documents", "people", "tickets"] })`. REST list endpoints accept 1–200 items and use opaque keyset cursors. Search supports POST JSON and GET query parameters and uses SQLite FTS5 BM25 (lower is more relevant), then one-hop relationships; expanded entities have score zero. No LLM is called for search. `/api/v1/stats` exposes the configured simulation date under `simulation.asOf`.
 
 Supply `X-CompanySim-Actor` for synthetic actor visibility. Unscoped requests are operator access. Search header/body actors must match. Control routes under `/api/control` are experimental; `/api/v1` is the public alpha data API. Set `COMPANYSIM_API_TOKEN` for a local bearer token when exposing beyond loopback. Cross-origin browser requests are rejected.
 
@@ -183,7 +186,7 @@ Anthropic uses the same flags with `--provider anthropic`. Select an available m
 
 ## Reproducibility
 
-Generator version 1 normalizes a fixed `asOf` timestamp (`2026-01-01T00:00:00.000Z`), seed and configuration. IDs use SHA-256 namespace derivation; names use seeded Mulberry32. Same normalized config, seed and generator version produce identical Lite state. History uses explicit role intervals, including a tested promotion. All domains are fictional `.test` identities.
+Generator version 2 normalizes an explicit `asOf` simulation timestamp, defaulting to the current UTC day. IDs use SHA-256 namespace derivation; names, dates and distributions use seeded Mulberry32. The same normalized config, seed and generator version produce identical Lite state. History uses explicit role intervals, including a tested promotion. All domains are fictional `.test` identities. Version 1 JSON exports remain importable.
 
 ## Validation
 

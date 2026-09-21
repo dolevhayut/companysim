@@ -133,6 +133,7 @@ const agentRunSchema = z
 const companySimReadTools = new Set([
   "get_company",
   "get_company_stats",
+  "get_company_entry_points",
   "search_company",
   "find_people",
   "find_teams",
@@ -151,6 +152,12 @@ const companySimReadTools = new Set([
   "get_message",
   "get_ticket",
   "get_tool",
+]);
+const generatorMetadataKeys = new Set([
+  "provider",
+  "model",
+  "promptVersion",
+  "contentJobId",
 ]);
 function projectChange(
   entity: Entity | undefined,
@@ -193,13 +200,64 @@ export class Services {
       throw new AppError("NOT_INITIALIZED", "Create a company first.", 404);
     return c;
   }
-  stats() {
-    return Object.fromEntries(
+  stats(): Record<
+    string,
+    number | { asOf: string | null; generatorVersion: number }
+  > & {
+    simulation: { asOf: string | null; generatorVersion: number };
+  } {
+    const counts = Object.fromEntries(
       this.db.sql
         .prepare("SELECT type,count(*) AS count FROM entities GROUP BY type")
         .all()
         .map((r) => [String(r.type), Number(r.count)]),
-    );
+    ) as Record<string, number>;
+    return {
+      ...counts,
+      simulation: {
+        asOf: this.db.meta<Config>("config")?.asOf ?? null,
+        generatorVersion:
+          this.db.meta<number>("generatorVersion") ?? GENERATOR_VERSION,
+      },
+    };
+  }
+  entryPoints(actorId?: string) {
+    this.actor(actorId);
+    const visible = (entity: Entity) => this.visible(entity, actorId);
+    const activeProjects = this.db
+      .all("project")
+      .filter(
+        (project) =>
+          visible(project) &&
+          !["completed", "cancelled"].includes(project.status ?? ""),
+      )
+      .sort((a, b) =>
+        String(a.targetDate ?? "").localeCompare(String(b.targetDate ?? "")),
+      )
+      .slice(0, 8);
+    const atRiskCustomers = this.db
+      .all("customer")
+      .filter(
+        (customer) =>
+          visible(customer) &&
+          (customer.status === "at_risk" || (customer.health ?? 100) < 60),
+      )
+      .sort((a, b) => (a.health ?? 100) - (b.health ?? 100))
+      .slice(0, 8);
+    const keyPeople = this.db
+      .all("person")
+      .filter((person) => {
+        const role = this.db.get(person.currentRoleId ?? "");
+        return visible(person) && (role?.isManager || !person.managerPersonId);
+      })
+      .slice(0, 8);
+    return {
+      company: this.company(),
+      simulation: this.stats().simulation,
+      activeProjects,
+      atRiskCustomers,
+      keyPeople,
+    };
   }
   assertIdle() {
     if (this.running)
@@ -543,7 +601,7 @@ export class Services {
     const data = z
       .object({
         formatVersion: z.literal(1),
-        generatorVersion: z.literal(1),
+        generatorVersion: z.union([z.literal(1), z.literal(2)]),
         config: configSchema,
         entities: z.array(entitySchema).max(1000000),
         jobs: z
@@ -682,13 +740,19 @@ export class Services {
     return { deleted: true };
   }
   private scenarioTargets() {
-    const project = this.db.all("project")[0];
+    const projects = this.db.all("project");
+    const project =
+      projects.find((item) => item.status === "active") ?? projects[0];
     const customer = project?.customerId
       ? this.db.get(project.customerId)
       : this.db.all("customer")[0];
     const ticket = project
-      ? (this.db.all("ticket").find((item) => item.projectId === project.id) ??
-        this.db.all("ticket")[0])
+      ? (this.db
+          .all("ticket")
+          .find(
+            (item) =>
+              item.projectId === project.id && item.priority !== "urgent",
+          ) ?? this.db.all("ticket")[0])
       : this.db.all("ticket")[0];
     return { project, customer, ticket };
   }
@@ -1120,16 +1184,15 @@ export class Services {
           .parse(JSON.parse(raw));
         const body = this.providers.redact(result.body);
         this.db.transaction(() => {
+          const metadata = Object.fromEntries(
+            Object.entries(e.metadata ?? {}).filter(
+              ([key]) => !generatorMetadataKeys.has(key),
+            ),
+          );
           this.db.put({
             ...e,
             ...(e.type === "ticket" ? { description: body } : { body }),
-            metadata: {
-              ...e.metadata,
-              provider: options.provider,
-              model: options.model,
-              promptVersion: "1",
-              contentJobId: j.id,
-            },
+            metadata: Object.keys(metadata).length ? metadata : undefined,
           });
           this.db.sql
             .prepare("UPDATE jobs SET state='completed' WHERE id=?")

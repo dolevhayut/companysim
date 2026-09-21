@@ -49,19 +49,30 @@ export function generate(input: unknown): {
   const uid = (t: string, i: number) =>
     t + "_" + hash([root, t, i]).slice(0, 20);
   const now = c.asOf;
-  const start = new Date(
-    Date.parse(now) - c.historyYears * 365 * 86400000,
-  ).toISOString();
-  const middle = new Date(
-    (Date.parse(start) + Date.parse(now)) / 2,
-  ).toISOString();
+  const nowMs = Date.parse(now);
+  const startMs = nowMs - c.historyYears * 365 * 86400000;
+  const start = new Date(startMs).toISOString();
+  const middle = new Date((startMs + nowMs) / 2).toISOString();
+  const between = (key: string, i: number, from = startMs, to = nowMs) => {
+    const value = rng(`${c.seed}:${key}:${i}`)();
+    return new Date(
+      from + Math.floor(value * Math.max(1, to - from)),
+    ).toISOString();
+  };
+  const offset = (days: number) =>
+    new Date(nowMs + days * 86400000).toISOString();
   const add = (type: EntityType, i: number, data: Partial<Entity>) => {
+    const createdAt =
+      data.createdAt ?? between(`${type}:created`, i, startMs, nowMs);
+    const updatedAt =
+      data.updatedAt ??
+      between(`${type}:updated`, i, Date.parse(createdAt), nowMs);
     const e = {
       id: uid(type, i),
       type,
-      createdAt: start,
-      updatedAt: now,
       ...data,
+      createdAt,
+      updatedAt,
     };
     entities.push(e);
     return e;
@@ -78,6 +89,8 @@ export function generate(input: unknown): {
     companySizeProfile:
       c.employees < 50 ? "startup" : c.employees < 250 ? "smb" : "mid-market",
     websiteDomain: c.name.toLowerCase().replace(/[^a-z0-9]/g, "-") + ".test",
+    createdAt: start,
+    updatedAt: now,
   });
   c.locations.forEach((l, i) =>
     add("location", i, { ...l, kind: i === 0 ? "headquarters" : "office" }),
@@ -91,6 +104,20 @@ export function generate(input: unknown): {
     "Operations",
   ].slice(0, Math.min(6, Math.ceil(c.employees / 8)));
   const teamCount = Math.ceil(c.employees / 8);
+  const teamSpecialties = [
+    "Platform",
+    "Foundations",
+    "Experience",
+    "Growth",
+    "Operations",
+    "Insights",
+    "Reliability",
+    "Enablement",
+    "Core Systems",
+    "Customer Outcomes",
+    "Automation",
+    "Strategy",
+  ];
   for (let i = 0; i < depts.length; i++)
     add("department", i, {
       name: depts[i],
@@ -99,7 +126,13 @@ export function generate(input: unknown): {
     });
   for (let i = 0; i < teamCount; i++)
     add("team", i, {
-      name: depts[i % depts.length] + " " + (i + 1),
+      name:
+        depts[i % depts.length] +
+        " · " +
+        teamSpecialties[i % teamSpecialties.length] +
+        (i >= teamSpecialties.length
+          ? ` ${String.fromCharCode(65 + (Math.floor(i / teamSpecialties.length) % 26))}`
+          : ""),
       departmentId: uid("department", i % depts.length),
       managerPersonId: uid("person", i * 8),
       memberCount: Math.min(8, c.employees - i * 8),
@@ -149,6 +182,8 @@ export function generate(input: unknown): {
       departmentId: uid("department", dep),
       isManager: i === 0 || i % 8 === 0,
     });
+    const personStart =
+      i === 0 ? start : between("person:start", i, startMs, nowMs - 86400000);
     add("person", i, {
       firstName: name,
       lastName: surname,
@@ -168,7 +203,8 @@ export function generate(input: unknown): {
             ),
           }
         : {}),
-      startDate: start,
+      startDate: personStart,
+      createdAt: personStart,
       skills: [depts[dep]],
       locale: "en-US",
     });
@@ -200,47 +236,107 @@ export function generate(input: unknown): {
     });
   const person = (i: number) =>
     entities.find((e) => e.id === uid("person", i % c.employees))!;
+  const customerNames = [
+    "Northstar Systems",
+    "Cloudcrest Health",
+    "Willow & Finch",
+    "Summit Works",
+    "Juniper Labs",
+    "Harborline Logistics",
+    "Copperfield Energy",
+    "Brightpath Learning",
+    "Redwood Commerce",
+    "Aster Finance",
+    "Lumen Foods",
+    "Meridian Robotics",
+    "Bluebird Mobility",
+    "Evergreen Legal",
+    "Stonebridge Media",
+    "Orbit Bio",
+  ];
+  const renewalOffsets = [-120, -45, 14, 35, 75, 120, 210, 320];
+  const healthScores = [28, 43, 54, 61, 69, 76, 82, 88, 93, 97];
+  const annualValues = [
+    12000, 18000, 26000, 39000, 55000, 78000, 110000, 165000, 240000, 360000,
+  ];
+  let contactIndex = 0;
   for (let i = 0; i < counts.customers; i++) {
+    const customerName =
+      customerNames[i % customerNames.length] +
+      (i >= customerNames.length
+        ? ` ${Math.floor(i / customerNames.length) + 2}`
+        : "");
+    const health = healthScores[(i * 7 + 2) % healthScores.length];
     add("customer", i, {
-      name:
-        ["Northstar", "Cloudcrest", "Willow", "Summit"][i % 4] +
-        " Labs " +
-        (i + 1),
+      name: customerName,
       industry: c.industry,
-      status: i % 7 === 0 ? "at_risk" : "active",
+      status: health < 55 ? "at_risk" : i % 9 === 0 ? "onboarding" : "active",
       accountOwnerPersonId: person(i).id,
-      annualValue: 10000 + i * 1250,
+      annualValue:
+        annualValues[(i * 3) % annualValues.length] *
+        (1 + Math.floor(i / annualValues.length)),
       currency: "USD",
-      startDate: start,
-      renewalDate: now,
-      health: 60 + (i % 40),
+      startDate: between("customer:start", i, startMs, nowMs - 180 * 86400000),
+      renewalDate: offset(renewalOffsets[i % renewalOffsets.length]),
+      health,
     });
-    add("customerContact", i, {
-      customerId: uid("customer", i),
-      name: first[i % first.length] + " " + last[i % last.length],
-      email: `contact@customer-${i}.test`,
-      title: "Operations Director",
-    });
+    const customerDomain = customerName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-");
+    for (let j = 0; j < 1 + (i % 3); j++) {
+      const contactFirst = first[(i * 3 + j) % first.length];
+      const contactLast = last[(i * 5 + j * 2) % last.length];
+      add("customerContact", contactIndex++, {
+        customerId: uid("customer", i),
+        name: `${contactFirst} ${contactLast}`,
+        email: `${contactFirst.toLowerCase()}.${contactLast.toLowerCase()}@${customerDomain}.test`,
+        title: ["Operations Director", "Technical Lead", "Finance Partner"][j],
+      });
+    }
   }
+  const projectNames = [
+    "Atlas Migration",
+    "Beacon Launch",
+    "Cedar Integration",
+    "Drift Analytics",
+    "Everest Rollout",
+    "Foundry Modernization",
+    "Gemini Portal",
+    "Horizon Data Hub",
+    "Ion Automation",
+    "Keystone Expansion",
+    "Lantern Mobile",
+    "Mosaic Billing",
+    "Nimbus Security",
+    "Orchard Workspace",
+    "Pulse Insights",
+    "Quartz Platform",
+  ];
+  const projectStatuses = [
+    "active",
+    "active",
+    "at_risk",
+    "blocked",
+    "completed",
+    "on_hold",
+  ];
+  const projectPriorities = ["high", "medium", "critical", "low", "medium"];
+  const projectTargetOffsets = [-90, -21, 10, 35, 75, 140, 240];
   for (let i = 0; i < counts.projects; i++) {
     const project = add("project", i, {
       name:
-        [
-          "Atlas Migration",
-          "Beacon Launch",
-          "Cedar Integration",
-          "Drift Analytics",
-        ][i % 4] +
-        " " +
-        (i + 1),
-      status: "active",
+        projectNames[i % projectNames.length] +
+        (i >= projectNames.length
+          ? ` ${Math.floor(i / projectNames.length) + 2}`
+          : ""),
+      status: projectStatuses[i % projectStatuses.length],
       ownerPersonId: person(i).id,
       customerId: uid("customer", i % counts.customers),
       teamIds: [uid("team", i % teamCount)],
-      startDate: start,
-      targetDate: now,
+      startDate: between("project:start", i, startMs, nowMs - 120 * 86400000),
+      targetDate: offset(projectTargetOffsets[i % projectTargetOffsets.length]),
       description: "Delivery, migration and adoption for a fictional customer.",
-      priority: "high",
+      priority: projectPriorities[i % projectPriorities.length],
     });
     relate(project, person(i), "owns");
     relate(
@@ -253,10 +349,10 @@ export function generate(input: unknown): {
     add("task", i, {
       projectId: project.id,
       title: project.name + " readiness",
-      status: "in_progress",
+      status: ["todo", "in_progress", "blocked", "completed"][i % 4],
       assigneePersonId: person(i).id,
       reporterPersonId: person(0).id,
-      priority: "medium",
+      priority: ["low", "medium", "high", "urgent"][i % 4],
     });
   }
   add("folder", 0, {
@@ -264,9 +360,21 @@ export function generate(input: unknown): {
     ownerPersonId: person(0).id,
     visibility: "company",
   });
+  const conversationStarts: string[] = [];
   for (let i = 0; i < teamCount; i++) {
+    const conversationStart = between(
+      "conversation:start",
+      i,
+      startMs,
+      nowMs - 86400000,
+    );
+    conversationStarts.push(conversationStart);
+    const team = entities.find((entity) => entity.id === uid("team", i))!;
     add("channel", i, {
-      name: "team-" + (i + 1),
+      name: String(team.name)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, ""),
       kind: "public",
       teamId: uid("team", i),
     });
@@ -277,15 +385,24 @@ export function generate(input: unknown): {
         (_, j) => person(i * 8 + j).id,
       ),
       subject: "Delivery coordination",
-      startedAt: middle,
+      startedAt: conversationStart,
+      createdAt: conversationStart,
     });
   }
   const projects = entities.filter((e) => e.type === "project");
   for (let i = 0; i < counts.documents; i++) {
-    const p = projects[i % projects.length],
-      author = person(i);
+    const projectRng = rng(`${c.seed}:document:project:${i}`);
+    const p = projects[Math.floor(projectRng() ** 1.6 * projects.length)],
+      author =
+        i === 0 ? person(0) : person(Math.floor(projectRng() * c.employees));
+    const createdAt = between(
+      "document:created",
+      i,
+      Date.parse(author.startDate!),
+      i === 0 ? Date.parse(middle) : nowMs,
+    );
     const oldTitle =
-      i % c.employees === 0
+      author.id === person(0).id && createdAt < middle
         ? "Founding Director"
         : entities.find((e) => e.id === author.currentRoleId)!.title;
     add("document", i, {
@@ -299,18 +416,37 @@ export function generate(input: unknown): {
       authorPersonId: author.id,
       projectId: p.id,
       customerId: p.customerId,
-      createdAt: start,
+      createdAt,
       visibility: i % 10 === 0 ? "private" : "company",
     });
   }
   for (let i = 0; i < counts.messages; i++) {
-    const p = projects[i % projects.length],
-      sender = person(i);
+    const messageRng = rng(`${c.seed}:message:links:${i}`);
+    const p = projects[Math.floor(messageRng() ** 1.6 * projects.length)],
+      sender = person(Math.floor(messageRng() * c.employees));
+    const conversationIndex = Math.floor(
+      Number(
+        sender.currentTeamId === undefined
+          ? 0
+          : entities
+              .filter((e) => e.type === "team")
+              .findIndex((team) => team.id === sender.currentTeamId),
+      ),
+    );
+    const timestamp = between(
+      "message:timestamp",
+      i,
+      Math.max(
+        Date.parse(sender.startDate!),
+        Date.parse(conversationStarts[Math.max(0, conversationIndex)]),
+      ),
+      nowMs,
+    );
     add("message", i, {
-      conversationId: uid("conversation", Math.floor((i % c.employees) / 8)),
+      conversationId: uid("conversation", Math.max(0, conversationIndex)),
       senderPersonId: sender.id,
-      timestamp: middle,
-      createdAt: middle,
+      timestamp,
+      createdAt: timestamp,
       body: `${p.name}: ${sender.displayName} shared a delivery update. Please review the customer migration checklist and open risks.`,
       projectId: p.id,
       customerId: p.customerId,
@@ -318,13 +454,20 @@ export function generate(input: unknown): {
   }
   if (c.features.tickets)
     for (let i = 0; i < counts.customers * 2; i++) {
-      const p = projects[i % projects.length];
+      const ticketRng = rng(`${c.seed}:ticket:project:${i}`);
+      const p = projects[Math.floor(ticketRng() ** 1.5 * projects.length)];
       add("ticket", i, {
         title: p.name + " support request " + (i + 1),
         description:
           "Fictional customer requests help validating the integration rollout.",
-        status: "open",
-        priority: i % 4 === 0 ? "high" : "medium",
+        status: [
+          "open",
+          "in_progress",
+          "resolved",
+          "closed",
+          "waiting_on_customer",
+        ][i % 5],
+        priority: ["low", "medium", "high", "urgent"][i % 4],
         assigneePersonId: person(i).id,
         customerId: p.customerId,
         projectId: p.id,
@@ -340,15 +483,20 @@ export function generate(input: unknown): {
       visibility: "company",
     });
   if (c.features.tools)
-    ["CRM", "HRIS", "issue_tracker", "chat", "file_storage"].forEach(
-      (category, i) =>
-        add("tool", i, {
-          name: "Company " + category,
-          category,
-          status: "active",
-          ownedByDepartmentId: uid("department", i % depts.length),
-          adminPersonIds: [person(i).id],
-        }),
+    [
+      ["Northstar CRM", "crm"],
+      ["PeopleOS", "hris"],
+      ["Trackline", "issue_tracker"],
+      ["Relay Chat", "chat"],
+      ["VaultDrive", "file_storage"],
+    ].forEach(([name, category], i) =>
+      add("tool", i, {
+        name,
+        category,
+        status: "active",
+        ownedByDepartmentId: uid("department", i % depts.length),
+        adminPersonIds: [person(i).id],
+      }),
     );
   for (const p of entities.filter((e) => e.type === "person")) {
     relate(
@@ -384,18 +532,20 @@ export function generate(input: unknown): {
       );
   }
   if (c.features.events) {
+    let eventIndex = 0;
     entities
       .filter((e) => e.type === "person")
-      .forEach((p, i) =>
-        add("event", i, {
+      .forEach((p) =>
+        add("event", eventIndex++, {
           eventType: "employee_hired",
-          occurredAt: start,
+          occurredAt: p.startDate,
           subjectType: "person",
           subjectId: p.id,
           payload: {},
+          createdAt: p.startDate,
         }),
       );
-    add("event", c.employees, {
+    add("event", eventIndex++, {
       eventType: "employee_promoted",
       occurredAt: middle,
       subjectType: "person",
@@ -404,7 +554,38 @@ export function generate(input: unknown): {
         fromRoleId: uid("role", c.employees),
         toRoleId: uid("role", 0),
       },
+      createdAt: middle,
     });
+    for (const p of projects)
+      add("event", eventIndex++, {
+        eventType: "project_started",
+        occurredAt: p.startDate,
+        subjectType: "project",
+        subjectId: p.id,
+        payload: { status: p.status },
+        createdAt: p.startDate,
+      });
+    for (const customer of entities.filter((e) => e.type === "customer"))
+      add("event", eventIndex++, {
+        eventType: "customer_onboarded",
+        occurredAt: customer.startDate,
+        subjectType: "customer",
+        subjectId: customer.id,
+        payload: { health: customer.health },
+        createdAt: customer.startDate,
+      });
+    for (const ticket of entities.filter((e) => e.type === "ticket"))
+      add("event", eventIndex++, {
+        eventType:
+          ticket.status === "resolved" || ticket.status === "closed"
+            ? "ticket_resolved"
+            : "ticket_opened",
+        occurredAt: ticket.updatedAt,
+        subjectType: "ticket",
+        subjectId: ticket.id,
+        payload: { priority: ticket.priority },
+        createdAt: ticket.updatedAt,
+      });
   }
   const doc = entities.find((e) => e.type === "document");
   if (doc)

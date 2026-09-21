@@ -155,7 +155,7 @@ Maintain an explicit generator version independent from package version.
 Example:
 
 ```text
-generatorVersion: 1
+generatorVersion: 2
 ```
 
 Structural reproducibility guarantees apply to:

@@ -23,6 +23,7 @@ http://localhost:4545/api/v1
 GET /health
 GET /api/v1/company
 GET /api/v1/stats
+GET /api/v1/entry-points
 GET /openapi.json
 GET /docs
 ```
@@ -157,6 +158,12 @@ Request:
 }
 ```
 
+Read-only clients can use the equivalent query-string form:
+
+```http
+GET /api/v1/search?query=Atlas%20migration&types=project,document&limit=25
+```
+
 Response:
 
 ```json
@@ -176,6 +183,11 @@ Response:
 ```
 
 Scores from FTS do not need to pretend to be normalized probabilities. Document score semantics clearly.
+
+All list endpoints accept `limit` from 1 through 200 and an opaque `cursor`.
+Values outside that range return a `400 VALIDATION` response. The OpenAPI
+document includes pagination parameters, entity component schemas and concrete
+response references for code generation.
 
 ## 6. Generation endpoints for local UI
 

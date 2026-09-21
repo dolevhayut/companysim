@@ -1,6 +1,8 @@
 import { z } from "zod";
-export const VERSION = "0.1.0-alpha.1";
-export const GENERATOR_VERSION = 1;
+export const VERSION = "0.1.0-alpha.2";
+export const GENERATOR_VERSION = 2;
+const currentUtcDay = () =>
+  new Date().toISOString().slice(0, 10) + "T00:00:00.000Z";
 export const types = [
   "company",
   "location",
@@ -200,7 +202,7 @@ export const configSchema = z
     employees: z.coerce.number().int().min(1).max(10000).default(100),
     historyYears: z.coerce.number().int().min(1).max(50).default(5),
     seed: z.coerce.string().max(100).default("42"),
-    asOf: z.iso.datetime().default("2026-01-01T00:00:00.000Z"),
+    asOf: z.iso.datetime().default(currentUtcDay),
     mode: z.enum(["lite", "realistic"]).default("lite"),
     density: z.enum(["low", "medium", "high"]).default("low"),
     regions: z.array(z.string().max(50)).min(1).default(["US"]),
