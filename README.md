@@ -60,7 +60,7 @@ The Developer screen also includes Claude Code configuration, a downloadable `SK
 
 Open **Scenario Lab** after creating a company to apply a controlled delivery-risk, renewal-risk or security-review change. The preview shows every changed field before it is written, and the run creates an auditable `scenario_applied` event in the same SQLite dataset used by REST and MCP.
 
-Save a snapshot before applying a scenario when you want a restore point. After applying it, run the local readiness check and copy its agent prompt into an MCP-connected agent. The check verifies that the scenario records resolve and can be found through CompanySim search; it does not execute or score a third-party agent.
+Save a snapshot before applying a scenario when you want a restore point. After applying it, run the local readiness check and copy its agent prompt into an MCP-connected agent. Download a test pack when you want to share the scenario, diff, checks and prompt with a teammate or keep it as a repeatable fixture. Scenario history stays with the company and is included in snapshots and JSON exports. The check verifies that the scenario records resolve and can be found through CompanySim search; it does not execute or score a third-party agent.
 
 ## Docker quickstart
 

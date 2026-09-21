@@ -171,6 +171,23 @@ test("B W M: first-run, dashboard, employee, developer endpoints and snapshot re
   expect(await page.evaluate(() => navigator.clipboard.readText())).toContain(
     "CompanySim MCP",
   );
+  const testPackDownload = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Download test pack", exact: true })
+    .click();
+  const testPack = await testPackDownload;
+  expect(testPack.suggestedFilename()).toBe(
+    "companysim-delivery-risk-test-pack.json",
+  );
+  expect(
+    JSON.parse(await readFile((await testPack.path())!, "utf8")).agentPrompt,
+  ).toContain("CompanySim MCP");
+  await expect(
+    page.getByRole("heading", {
+      name: "Changes already in this company",
+      exact: true,
+    }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Search", exact: true }).click();
   await expect(page.getByText("Find anything in your company")).toBeVisible();
   await page.getByLabel("Search company").fill("zzzznonexistentzzzz");

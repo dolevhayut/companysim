@@ -85,6 +85,7 @@ function App() {
     [providerStatus, setProviderStatus] = useState<Row[]>([]),
     [filter, setFilter] = useState(""),
     [scenarios, setScenarios] = useState<Row[]>([]),
+    [scenarioHistory, setScenarioHistory] = useState<Row[]>([]),
     [scenarioPreview, setScenarioPreview] = useState<Row | null>(null),
     [scenarioEvaluation, setScenarioEvaluation] = useState<Row | null>(null);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
@@ -186,8 +187,11 @@ function App() {
       );
     if (page === "Scenarios")
       void guard(async () => {
-        const data = await api<{ scenarios: Row[] }>("/api/control/scenarios");
+        const data = await api<{ scenarios: Row[]; history: Row[] }>(
+          "/api/control/scenarios",
+        );
         setScenarios(data.scenarios);
+        setScenarioHistory(data.history);
         setScenarioPreview(null);
         setScenarioEvaluation(null);
       });
@@ -1138,6 +1142,10 @@ function App() {
                                   "POST",
                                 );
                                 setScenarioPreview(result);
+                                const catalog = await api<{ history: Row[] }>(
+                                  "/api/control/scenarios",
+                                );
+                                setScenarioHistory(catalog.history);
                                 setNotice("Scenario applied. The change is now visible through REST and MCP.");
                                 await refresh();
                               },
@@ -1205,6 +1213,68 @@ function App() {
                       >
                         Copy agent evaluation prompt
                       </button>
+                      <button
+                        onClick={() => {
+                          const scenario = scenarioEvaluation.scenario as
+                            | Row
+                            | undefined;
+                          downloadText(
+                            JSON.stringify(
+                              {
+                                formatVersion: 1,
+                                exportedAt: new Date().toISOString(),
+                                purpose:
+                                  "Read-only CompanySim agent evaluation fixture",
+                                scenario,
+                                checks: scenarioEvaluation.checks,
+                                agentPrompt: scenarioEvaluation.agentPrompt,
+                              },
+                              null,
+                              2,
+                            ),
+                            `companysim-${String(scenario?.id ?? "scenario")}-test-pack.json`,
+                            "application/json",
+                          );
+                          setNotice("Scenario test pack downloaded.");
+                        }}
+                      >
+                        Download test pack
+                      </button>
+                    </section>
+                  )}
+                  {scenarioHistory.length > 0 && (
+                    <section className="scenario-history">
+                      <div className="scenario-workbench-heading">
+                        <div>
+                          <span className="eyebrow">RUN HISTORY</span>
+                          <h2>Changes already in this company</h2>
+                          <p>
+                            These scenario events persist with the company and are included in snapshots and exports.
+                          </p>
+                        </div>
+                        <button onClick={() => setPage("Events")}>
+                          Open events <ArrowUpRight size={15} aria-hidden="true" />
+                        </button>
+                      </div>
+                      <div className="scenario-history-list">
+                        {scenarioHistory
+                          .slice()
+                          .reverse()
+                          .map((run) => (
+                            <div key={String(run.id)}>
+                              <span className="scenario-icon" aria-hidden="true">
+                                <Check size={16} />
+                              </span>
+                              <span>
+                                <strong>{String(run.title)}</strong>
+                                <small>{String(run.affectedIds instanceof Array ? run.affectedIds.length : 0)} records changed</small>
+                              </span>
+                              <time dateTime={String(run.appliedAt)}>
+                                {new Date(String(run.appliedAt)).toLocaleString()}
+                              </time>
+                            </div>
+                          ))}
+                      </div>
                     </section>
                   )}
                 </>

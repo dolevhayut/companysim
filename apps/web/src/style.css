@@ -1060,6 +1060,9 @@ section {
 .scenario-evaluation {
   background: #fbfcfb;
 }
+.scenario-evaluation > button + button {
+  margin-left: 8px;
+}
 .check-icon {
   color: #4e9870;
 }
@@ -1095,6 +1098,42 @@ section {
   font-size: 10px;
   line-height: 1.45;
   margin-top: 4px;
+}
+.scenario-history {
+  background: #fcfcfd;
+}
+.scenario-history-list {
+  margin-top: 24px;
+  border-top: 1px solid #eceef1;
+}
+.scenario-history-list > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid #eceef1;
+}
+.scenario-history-list .scenario-icon {
+  width: 30px;
+  height: 30px;
+  color: #57936f;
+  background: #eef7f1;
+  border-color: #dcecdf;
+}
+.scenario-history-list > div > span:nth-child(2) {
+  display: grid;
+  gap: 3px;
+  flex: 1;
+}
+.scenario-history-list strong {
+  font-size: 12px;
+  color: #5f666d;
+  font-weight: 550;
+}
+.scenario-history-list small,
+.scenario-history-list time {
+  color: #92979f;
+  font-size: 10px;
 }
 .table {
   margin-top: 23px;
