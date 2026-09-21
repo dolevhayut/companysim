@@ -18,7 +18,7 @@ export function agentSkill(origin: string) {
   return skillTemplate.replaceAll("{{BASE_URL}}", origin);
 }
 export function agentPrompt(origin: string) {
-  return `Connect to my running CompanySim at ${origin} and help me work with its synthetic company. Set up the companysim MCP server in this agent client's supported configuration, preserving existing servers. Verify the connection with get_company and get_company_stats, then summarize the available company and ask what I want to build or test. If your environment cannot reach my localhost, explain that limitation rather than claiming connection success. Do not create, reset, enrich or restore company data as part of setup.\n\nUse the following CompanySim skill. If this host supports reusable skills, install it as companysim/SKILL.md in the appropriate project skill directory, following the host's conventions; otherwise use it as task guidance. Replace an existing skill only after checking its contents.\n\n${agentSkill(origin)}`;
+  return `Connect to my running CompanySim at ${origin} and help me work with its synthetic company. Set up the companysim MCP server in this agent client's supported configuration, preserving existing servers. Verify the connection with get_company, get_company_stats and get_company_entry_points. Treat simulation.asOf as the company's current date, summarize the available company and useful starting entities, then ask what I want to build or test. If your environment cannot reach my localhost, explain that limitation rather than claiming connection success. Do not create, reset, enrich or restore company data as part of setup.\n\nUse the following CompanySim skill. If this host supports reusable skills, install it as companysim/SKILL.md in the appropriate project skill directory, following the host's conventions; otherwise use it as task guidance. Replace an existing skill only after checking its contents.\n\n${agentSkill(origin)}`;
 }
 function CopyText({ text, label }: { text: string; label: string }) {
   const [copied, setCopied] = useState(false);
@@ -92,7 +92,8 @@ export function AgentGuide() {
           <li>Add the HTTP server using one of the configurations below.</li>
           <li>
             Reload your client’s MCP tools, then ask it to call{" "}
-            <code>get_company</code> and <code>get_company_stats</code>.
+            <code>get_company</code>, <code>get_company_stats</code> and{" "}
+            <code>get_company_entry_points</code>.
           </li>
         </ol>
         <h4>Codex CLI</h4>
