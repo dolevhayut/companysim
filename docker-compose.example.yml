@@ -1,0 +1,12 @@
+services:
+  companysim:
+    image: ghcr.io/companysim/companysim:latest
+    ports:
+      - "127.0.0.1:4545:4545"
+    volumes:
+      - ./company-data:/data
+    environment:
+      # Pass provider credentials from your shell/.env if you want AI enrichment.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    restart: unless-stopped

@@ -1,0 +1,15 @@
+node_modules/
+dist/
+company-data/
+*.db*
+.env
+coverage/
+test-results/
+playwright-report/
+.env.*
+!.env.example
+*.pem
+*.key
+*.tgz
+.DS_Store
+.21st/

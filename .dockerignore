@@ -1,0 +1,8 @@
+node_modules
+dist
+apps/web/dist
+company-data
+.git
+.env
+*.db*
+*.tgz

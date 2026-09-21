@@ -1,0 +1,38 @@
+version: 1
+
+company:
+  name: Acme Corporation
+  industry: saas
+  employees: 250
+  historyYears: 5
+  regions:
+    - US
+
+  locations:
+    - name: Austin HQ
+      country: US
+      city: Austin
+      timezone: America/Chicago
+
+generation:
+  seed: 824119
+  mode: realistic
+  density: medium
+  maxCostUsd: 3
+
+  features:
+    documents: true
+    messages: true
+    tickets: true
+    policies: true
+    tools: true
+    events: true
+
+provider:
+  type: anthropic
+  model: auto
+
+runtime:
+  host: 127.0.0.1
+  port: 4545
+  dataDir: ./company-data

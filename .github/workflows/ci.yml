@@ -1,0 +1,22 @@
+name: CompanySim CI
+on: [push, pull_request]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: corepack enable && corepack prepare pnpm@10.32.1 --activate
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm audit --prod --audit-level critical
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+      - run: pnpm test:docker
+      - run: npm pack
+      - uses: actions/upload-artifact@v4
+        with:
+          name: companysim-alpha
+          path: '*.tgz'
