@@ -6,6 +6,10 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Public alpha](https://img.shields.io/badge/status-public%20alpha-orange.svg)](CHANGELOG.md)
 
+<p align="center">
+  <img src="docs/social/companysim-linkedin-creative.png" width="560" alt="CompanySim — a whole company on localhost">
+</p>
+
 Spin up a fictional organization with employees, teams, customers, projects, documents, messages and tickets — connected through consistent identities and relationships. Explore it in your browser or let your agent query it through MCP.
 
 **No API key required. No cloud account. One local SQLite dataset across browser, REST, MCP and CLI.**
