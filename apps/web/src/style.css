@@ -930,6 +930,172 @@ section {
   background: none;
   color: #824923;
 }
+.scenario-intro,
+.scenario-workbench,
+.scenario-evaluation {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+}
+.scenario-intro h2 {
+  margin-top: 8px;
+}
+.scenario-intro p {
+  max-width: 620px;
+  margin-bottom: 0;
+}
+.scenario-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin: 20px 0;
+}
+.scenario-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 248px;
+  transition: border-color 0.16s, box-shadow 0.16s;
+}
+.scenario-card:hover,
+.scenario-card.selected {
+  border-color: #ddb89f;
+  box-shadow: 0 8px 22px #7a41220b;
+}
+.scenario-card.selected {
+  background: #fffaf7;
+}
+.scenario-card h3 {
+  margin: 12px 0 0;
+}
+.scenario-card p {
+  margin: 8px 0 18px;
+}
+.scenario-icon {
+  display: grid;
+  place-items: center;
+  width: 35px;
+  height: 35px;
+  border-radius: 9px;
+  background: #f8ede5;
+  color: #bf6a40;
+  border: 1px solid #efddcf;
+}
+.scenario-card > small {
+  margin-top: 18px;
+  color: #aa704e;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.75px;
+}
+.scenario-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+  gap: 8px;
+  color: #858a92;
+  font-size: 10px;
+}
+.scenario-card-footer button {
+  padding: 7px 9px;
+  font-size: 11px;
+}
+.scenario-workbench,
+.scenario-evaluation {
+  display: block;
+}
+.scenario-workbench-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+.scenario-workbench-heading h2 {
+  margin: 8px 0;
+}
+.scenario-workbench-heading p {
+  margin: 0;
+  max-width: 590px;
+}
+.scenario-diff {
+  display: grid;
+  gap: 0;
+  margin: 25px 0 0;
+  border: 1px solid #e8e9ec;
+  border-radius: 9px;
+  overflow: hidden;
+}
+.scenario-diff > div {
+  display: grid;
+  grid-template-columns: 100px 1fr minmax(70px, 0.8fr) 16px minmax(70px, 0.8fr);
+  gap: 12px;
+  align-items: center;
+  padding: 13px 15px;
+  border-bottom: 1px solid #eceef1;
+  font-size: 11px;
+}
+.scenario-diff > div:last-child {
+  border-bottom: 0;
+}
+.scenario-diff span {
+  color: #9a7b69;
+  text-transform: capitalize;
+}
+.scenario-diff strong {
+  font-weight: 550;
+  color: #5e636a;
+}
+.scenario-diff code:last-child {
+  color: #a34f27;
+  font-weight: 600;
+}
+.scenario-diff svg {
+  color: #acb0b5;
+}
+.scenario-evaluation {
+  background: #fbfcfb;
+}
+.check-icon {
+  color: #4e9870;
+}
+.evaluation-checks {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 25px 0;
+  border: 1px solid #e4eae6;
+  border-radius: 9px;
+  overflow: hidden;
+}
+.evaluation-checks > div {
+  display: flex;
+  gap: 10px;
+  padding: 15px;
+  border-right: 1px solid #e4eae6;
+  color: #55916d;
+}
+.evaluation-checks > div:last-child {
+  border-right: 0;
+}
+.evaluation-checks strong,
+.evaluation-checks small {
+  display: block;
+}
+.evaluation-checks strong {
+  color: #5c6562;
+  font-size: 11px;
+  font-weight: 550;
+}
+.evaluation-checks small {
+  color: #89928d;
+  font-size: 10px;
+  line-height: 1.45;
+  margin-top: 4px;
+}
 .table {
   margin-top: 23px;
 }
@@ -1295,6 +1461,19 @@ progress::-webkit-progress-value {
   .overview-bottom {
     grid-template-columns: 1fr;
   }
+  .scenario-grid {
+    grid-template-columns: 1fr;
+  }
+  .evaluation-checks {
+    grid-template-columns: 1fr;
+  }
+  .evaluation-checks > div {
+    border-right: 0;
+    border-bottom: 1px solid #e4eae6;
+  }
+  .evaluation-checks > div:last-child {
+    border-bottom: 0;
+  }
   .overview-bottom section {
     margin-bottom: 0;
   }
@@ -1406,6 +1585,20 @@ progress::-webkit-progress-value {
   }
   .overview-bottom {
     gap: 0;
+  }
+  .scenario-intro {
+    display: block;
+  }
+  .scenario-intro > button {
+    margin-top: 18px;
+  }
+  .scenario-diff > div {
+    grid-template-columns: 1fr 1fr 16px 1fr;
+    gap: 8px;
+  }
+  .scenario-diff > div > span {
+    grid-column: 1 / -1;
+    font-size: 9px;
   }
   .connect-card h2 {
     font-size: 24px;

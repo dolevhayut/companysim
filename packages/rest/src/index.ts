@@ -226,6 +226,16 @@ export function createRest(s: Services, dataApi = true) {
     c.json(s.import(await c.req.json())),
   );
   app.get("/api/control/validation", (c) => c.json(s.validate()));
+  app.get("/api/control/scenarios", (c) => c.json(s.scenarios()));
+  app.get("/api/control/scenarios/:id/preview", (c) =>
+    c.json(s.scenarioPreview(c.req.param("id"))),
+  );
+  app.post("/api/control/scenarios/:id/apply", (c) =>
+    c.json(s.applyScenario(c.req.param("id"))),
+  );
+  app.post("/api/control/scenarios/:id/evaluate", (c) =>
+    c.json(s.evaluateScenario(c.req.param("id"))),
+  );
   app.get("/api/control/providers", (c) => c.json(s.providers.status()));
   const provider = z.enum(["openai", "anthropic"]);
   app.get("/api/control/providers/:provider/models", async (c) =>

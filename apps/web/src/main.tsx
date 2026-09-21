@@ -3,9 +3,12 @@ import { createRoot } from "react-dom/client";
 import "@fontsource-variable/geist/wght.css";
 import {
   ArrowUpRight,
+  Check,
+  ClipboardCheck,
   ArrowRight,
   Database,
   FileText,
+  FlaskConical,
   Layers,
   Sparkles,
   Terminal,
@@ -80,7 +83,10 @@ function App() {
     [jobCost, setJobCost] = useState(0.01),
     [preview, setPreview] = useState<Row | null>(null),
     [providerStatus, setProviderStatus] = useState<Row[]>([]),
-    [filter, setFilter] = useState("");
+    [filter, setFilter] = useState(""),
+    [scenarios, setScenarios] = useState<Row[]>([]),
+    [scenarioPreview, setScenarioPreview] = useState<Row | null>(null),
+    [scenarioEvaluation, setScenarioEvaluation] = useState<Row | null>(null);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [searchResults, setSearchResults] = useState<Row[] | null>(null);
   const [testingProvider, setTestingProvider] = useState(false);
@@ -178,6 +184,13 @@ function App() {
       void guard(async () =>
         setProviderStatus(await api<Row[]>("/api/control/providers")),
       );
+    if (page === "Scenarios")
+      void guard(async () => {
+        const data = await api<{ scenarios: Row[] }>("/api/control/scenarios");
+        setScenarios(data.scenarios);
+        setScenarioPreview(null);
+        setScenarioEvaluation(null);
+      });
   }, [page]);
   const configureProvider = async () => {
     if (provider !== "none" && key) {
@@ -1033,6 +1046,168 @@ function App() {
                     REST, MCP, CLI and this UI read the same persisted state.
                   </p>
                 </section>
+              )}
+              {company && page === "Scenarios" && (
+                <>
+                  <section className="scenario-intro">
+                    <div>
+                      <span className="eyebrow">SAFE, REPEATABLE TEST CASES</span>
+                      <h2>Scenario Lab</h2>
+                      <p>
+                        Apply a realistic change to this company, inspect the exact diff,
+                        then give an agent a grounded investigation prompt. Create a snapshot
+                        first if you want a one-click way back.
+                      </p>
+                    </div>
+                    <button onClick={() => setPage("Snapshots")}>
+                      <Database size={15} aria-hidden="true" /> Save baseline
+                    </button>
+                  </section>
+                  <div className="scenario-grid">
+                    {scenarios.map((scenario) => (
+                      <article
+                        className={
+                          scenarioPreview?.id === scenario.id
+                            ? "scenario-card selected"
+                            : "scenario-card"
+                        }
+                        key={String(scenario.id)}
+                      >
+                        <span className="scenario-icon" aria-hidden="true">
+                          <FlaskConical size={18} />
+                        </span>
+                        <small>{String(scenario.focus)}</small>
+                        <h3>{String(scenario.title)}</h3>
+                        <p>{String(scenario.description)}</p>
+                        <div className="scenario-card-footer">
+                          <span>{String(scenario.affectedCount)} connected records</span>
+                          <button
+                            onClick={() =>
+                              void guard(async () => {
+                                setScenarioPreview(
+                                  await api<Row>(
+                                    "/api/control/scenarios/" + scenario.id + "/preview",
+                                  ),
+                                );
+                                setScenarioEvaluation(null);
+                              })
+                            }
+                          >
+                            Preview <ArrowRight size={14} aria-hidden="true" />
+                          </button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                  {scenarioPreview && (
+                    <section className="scenario-workbench">
+                      <div className="scenario-workbench-heading">
+                        <div>
+                          <span className="eyebrow">CHANGE PREVIEW</span>
+                          <h2>{String(scenarioPreview.title)}</h2>
+                          <p>{String(scenarioPreview.description)}</p>
+                        </div>
+                        <span className="badge">{String(scenarioPreview.focus)}</span>
+                      </div>
+                      <div className="scenario-diff" aria-label="Scenario changes">
+                        {((scenarioPreview.changes as Row[] | undefined) ?? []).map(
+                          (change, index) => (
+                            <div key={String(change.entityId ?? "event") + index}>
+                              <span>{String(change.entityType)}</span>
+                              <strong>{String(change.field)}</strong>
+                              <code>{change.before == null ? "new" : String(change.before)}</code>
+                              <ArrowRight size={14} aria-hidden="true" />
+                              <code>{String(change.after)}</code>
+                            </div>
+                          ),
+                        )}
+                      </div>
+                      <div className="actions">
+                        <button
+                          className="primary"
+                          disabled={busy}
+                          onClick={() =>
+                            setConfirmation({
+                              title: "Apply scenario?",
+                              description:
+                                "CompanySim will write the displayed changes and add one scenario event. A snapshot lets you restore the previous state.",
+                              action: "Apply scenario",
+                              run: async () => {
+                                const result = await api<Row>(
+                                  "/api/control/scenarios/" + scenarioPreview.id + "/apply",
+                                  "POST",
+                                );
+                                setScenarioPreview(result);
+                                setNotice("Scenario applied. The change is now visible through REST and MCP.");
+                                await refresh();
+                              },
+                            })
+                          }
+                        >
+                          Apply to company <ArrowRight size={15} aria-hidden="true" />
+                        </button>
+                        <button
+                          onClick={() =>
+                            void guard(async () => {
+                              setScenarioEvaluation(
+                                await api<Row>(
+                                  "/api/control/scenarios/" + scenarioPreview.id + "/evaluate",
+                                  "POST",
+                                ),
+                              );
+                            })
+                          }
+                        >
+                          <ClipboardCheck size={15} aria-hidden="true" /> Run readiness check
+                        </button>
+                      </div>
+                    </section>
+                  )}
+                  {scenarioEvaluation && (
+                    <section className="scenario-evaluation">
+                      <div className="scenario-workbench-heading">
+                        <div>
+                          <span className="eyebrow">AGENT RETRIEVAL CHECK</span>
+                          <h2>
+                            {scenarioEvaluation.passed ? "Ready for an agent" : "Needs attention"}
+                          </h2>
+                          <p>
+                            This local check verifies the scenario’s records can be resolved and
+                            retrieved. It does not run or score an external agent.
+                          </p>
+                        </div>
+                        {Boolean(scenarioEvaluation.passed) && (
+                          <Check className="check-icon" size={23} />
+                        )}
+                      </div>
+                      <div className="evaluation-checks">
+                        {((scenarioEvaluation.checks as Row[] | undefined) ?? []).map(
+                          (check) => (
+                            <div key={String(check.id)}>
+                              <Check size={15} aria-hidden="true" />
+                              <span>
+                                <strong>{String(check.label)}</strong>
+                                <small>{String(check.detail)}</small>
+                              </span>
+                            </div>
+                          ),
+                        )}
+                      </div>
+                      <button
+                        onClick={() =>
+                          void guard(async () => {
+                            await navigator.clipboard.writeText(
+                              String(scenarioEvaluation.agentPrompt),
+                            );
+                            setNotice("Agent evaluation prompt copied.");
+                          })
+                        }
+                      >
+                        Copy agent evaluation prompt
+                      </button>
+                    </section>
+                  )}
+                </>
               )}
               {company && page === "Snapshots" && (
                 <section>

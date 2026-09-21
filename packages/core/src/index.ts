@@ -33,6 +33,38 @@ export interface Progress {
   error?: string;
   reservedCostUsd?: number;
 }
+const scenarioIds = ["delivery-risk", "renewal-risk", "security-review"] as const;
+type ScenarioId = (typeof scenarioIds)[number];
+type ScenarioHistory = {
+  id: string;
+  scenarioId: ScenarioId;
+  title: string;
+  appliedAt: string;
+  affectedIds: string[];
+};
+type ScenarioChange = {
+  entityId?: string;
+  entityType: string;
+  field: string;
+  before: unknown;
+  after: unknown;
+};
+function projectChange(
+  entity: Entity | undefined,
+  field: "status" | "priority",
+  after: string,
+): ScenarioChange[] {
+  if (!entity) return [];
+  return [
+    {
+      entityId: entity.id,
+      entityType: entity.type,
+      field,
+      before: entity[field],
+      after,
+    },
+  ];
+}
 export class Services {
   running: Promise<void> | undefined;
   constructor(
@@ -400,6 +432,7 @@ export class Services {
       jobs: this.db.sql.prepare("SELECT * FROM jobs ORDER BY id").all(),
       progress: this.status(),
       enrichment: this.db.meta("enrichment"),
+      scenarioHistory: this.db.meta("scenarioHistory"),
     };
   }
   import(input: unknown) {
@@ -416,6 +449,17 @@ export class Services {
           )
           .default([]),
         enrichment: enrichmentSchema.optional(),
+        scenarioHistory: z
+          .array(
+            z.object({
+              id: z.string(),
+              scenarioId: z.enum(scenarioIds),
+              title: z.string(),
+              appliedAt: z.string(),
+              affectedIds: z.array(z.string()),
+            }),
+          )
+          .optional(),
         progress: z
           .object({
             state: z.string(),
@@ -464,6 +508,8 @@ export class Services {
       this.db.setMeta("config", data.config);
       this.db.setMeta("generatorVersion", data.generatorVersion);
       if (data.enrichment) this.db.setMeta("enrichment", data.enrichment);
+      if (data.scenarioHistory)
+        this.db.setMeta("scenarioHistory", data.scenarioHistory);
       for (const j of data.jobs)
         this.db.sql
           .prepare("INSERT INTO jobs VALUES(?,?,?)")
@@ -531,6 +577,126 @@ export class Services {
   deleteSnapshot(name: string) {
     unlinkSync(this.snapshotPath(name));
     return { deleted: true };
+  }
+  private scenarioTargets() {
+    const project = this.db.all("project")[0];
+    const customer = project?.customerId
+      ? this.db.get(project.customerId)
+      : this.db.all("customer")[0];
+    const ticket = project
+      ? this.db.all("ticket").find((item) => item.projectId === project.id) ??
+        this.db.all("ticket")[0]
+      : this.db.all("ticket")[0];
+    return { project, customer, ticket };
+  }
+  private scenario(id: string) {
+    if (!scenarioIds.includes(id as ScenarioId))
+      throw new AppError("ENTITY_NOT_FOUND", "Scenario was not found.", 404);
+    const targets = this.scenarioTargets();
+    const all = Object.values(targets).filter(Boolean) as Entity[];
+    const data: Record<ScenarioId, { title: string; description: string; focus: string }> = {
+      "delivery-risk": {
+        title: "Delivery risk",
+        description: "A project is slipping and needs a connected customer, owner and support trail.",
+        focus: "project delivery",
+      },
+      "renewal-risk": {
+        title: "Renewal at risk",
+        description: "A customer’s renewal needs context across its account, projects and tickets.",
+        focus: "customer health",
+      },
+      "security-review": {
+        title: "Security review",
+        description: "A priority support issue requires an agent to retrieve the relevant company context.",
+        focus: "support triage",
+      },
+    };
+    const changes =
+      id === "delivery-risk"
+        ? projectChange(targets.project, "status", "at_risk")
+        : id === "renewal-risk"
+          ? projectChange(targets.customer, "status", "at_risk")
+          : [
+              ...projectChange(targets.ticket, "priority", "urgent"),
+              ...projectChange(targets.ticket, "status", "open"),
+            ];
+    return { id: id as ScenarioId, ...data[id as ScenarioId], targets: all, changes };
+  }
+  scenarios() {
+    this.company();
+    return {
+      scenarios: scenarioIds.map((id) => {
+        const scenario = this.scenario(id);
+        return {
+          id: scenario.id,
+          title: scenario.title,
+          description: scenario.description,
+          focus: scenario.focus,
+          affectedCount: scenario.targets.length,
+        };
+      }),
+      history: this.db.meta<ScenarioHistory[]>("scenarioHistory") ?? [],
+    };
+  }
+  scenarioPreview(id: string) {
+    this.company();
+    const scenario = this.scenario(id);
+    return {
+      ...scenario,
+      changes: [
+        ...scenario.changes,
+        { entityType: "event", field: "eventType", before: null, after: "scenario_applied" },
+      ],
+    };
+  }
+  applyScenario(id: string) {
+    this.assertIdle();
+    const preview = this.scenarioPreview(id);
+    const now = new Date().toISOString();
+    const history = this.db.meta<ScenarioHistory[]>("scenarioHistory") ?? [];
+    const runId = `scenario_${preview.id.replace(/-/g, "_")}_${history.length + 1}`;
+    this.db.transaction(() => {
+      for (const change of preview.changes) {
+        if (!change.entityId) continue;
+        const entity = this.db.get(change.entityId)!;
+        this.db.put({
+          ...entity,
+          [change.field]: change.after,
+          updatedAt: now,
+          metadata: { ...entity.metadata, scenario: preview.id, scenarioAppliedAt: now },
+        } as Entity);
+      }
+      this.db.put({
+        id: runId,
+        type: "event",
+        createdAt: now,
+        updatedAt: now,
+        eventType: "scenario_applied",
+        occurredAt: now,
+        actorType: "company",
+        actorId: this.company().id,
+        payload: { scenarioId: preview.id, title: preview.title, affectedIds: preview.targets.map((item) => item.id) },
+      });
+      this.db.setMeta("scenarioHistory", [
+        ...history,
+        { id: runId, scenarioId: preview.id, title: preview.title, appliedAt: now, affectedIds: preview.targets.map((item) => item.id) },
+      ]);
+    });
+    return { ...this.scenarioPreview(id), applied: true, runId };
+  }
+  evaluateScenario(id: string) {
+    const preview = this.scenarioPreview(id);
+    const first = preview.targets[0];
+    const searchable = first
+      ? this.search({ query: first.name ?? first.title ?? first.id }).results
+      : [];
+    const checks = [
+      { id: "targets", label: "Scenario targets resolve", passed: preview.targets.length > 0, detail: `${preview.targets.length} connected records available.` },
+      { id: "search", label: "Search returns scenario context", passed: searchable.length > 0, detail: `${searchable.length} result${searchable.length === 1 ? "" : "s"} returned for the primary target.` },
+      { id: "relationships", label: "Connected context is present", passed: preview.targets.length >= 2, detail: `${preview.targets.length} records can be inspected through REST or MCP.` },
+    ];
+    const prompt = `Use the CompanySim MCP server to investigate the ${preview.title.toLowerCase()} scenario. Start by calling get_company and search_company for ${JSON.stringify(first?.name ?? first?.title ?? first?.id ?? "the scenario target")}. Then inspect every returned project, customer, ticket and person that is relevant. Give a concise risk summary, cite the entity IDs used, and recommend the next action. Do not mutate, reset, restore or enrich the company.`;
+    return { scenario: preview, checks, passed: checks.every((check) => check.passed), agentPrompt: prompt };
   }
   reset() {
     this.assertIdle();

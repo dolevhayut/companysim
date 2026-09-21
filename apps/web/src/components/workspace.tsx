@@ -10,6 +10,7 @@ import {
   Code2,
   Database,
   FileText,
+  FlaskConical,
   FolderKanban,
   Globe2,
   LayoutDashboard,
@@ -44,6 +45,7 @@ export const pageIcons: Record<string, LucideIcon> = {
   Events: Activity,
   Search,
   Developer: Code2,
+  Scenarios: FlaskConical,
   Snapshots: Database,
   Settings: Settings2,
 };
@@ -75,7 +77,10 @@ export function Sidebar({
         "Events",
       ],
     },
-    { heading: "Manage", items: ["Developer", "Snapshots", "Settings"] },
+    {
+      heading: "Manage",
+      items: ["Developer", "Scenarios", "Snapshots", "Settings"],
+    },
   ];
   return (
     <aside className="sidebar">

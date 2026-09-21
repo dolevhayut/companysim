@@ -148,6 +148,33 @@ describe("CompanySim public alpha acceptance", () => {
     expect(schema.openapi).toBe("3.1.0");
     expect(schema.paths["/api/v1/people/{id}"]).toBeDefined();
   });
+  it("Scenario Lab changes the shared company state and exposes a retrieval-ready evaluation", async () => {
+    const s = service();
+    s.create({ employees: 50 });
+    const app = createRest(s);
+    const catalog = await (await app.request("/api/control/scenarios")).json();
+    expect(catalog.scenarios).toHaveLength(3);
+    const preview = await (
+      await app.request("/api/control/scenarios/delivery-risk/preview")
+    ).json();
+    expect(preview.changes.some((change: { entityId?: string }) => change.entityId)).toBe(true);
+    const applied = await (
+      await app.request("/api/control/scenarios/delivery-risk/apply", {
+        method: "POST",
+      })
+    ).json();
+    expect(applied.applied).toBe(true);
+    expect(s.db.get(applied.runId)?.type).toBe("event");
+    const evaluation = await (
+      await app.request("/api/control/scenarios/delivery-risk/evaluate", {
+        method: "POST",
+      })
+    ).json();
+    expect(evaluation.passed).toBe(true);
+    expect(evaluation.agentPrompt).toContain("CompanySim MCP");
+    const exported = s.export();
+    expect(exported.scenarioHistory).toHaveLength(1);
+  });
   it("F H P: real HTTP MCP client and REST use identical persisted state without AI", async () => {
     const runtime = await startServer({
       dataDir: directory(),

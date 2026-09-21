@@ -145,6 +145,32 @@ test("B W M: first-run, dashboard, employee, developer endpoints and snapshot re
   await expect(
     page.getByText("Snapshot restored.", { exact: true }),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Scenarios", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Scenario Lab", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Preview", exact: true }).first().click();
+  await expect(
+    page.getByRole("heading", { name: "Delivery risk", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Apply to company", exact: true }).click();
+  const scenarioConfirmation = page.getByRole("alertdialog", {
+    name: "Apply scenario?",
+  });
+  await scenarioConfirmation
+    .getByRole("button", { name: "Apply scenario", exact: true })
+    .click();
+  await expect(page.getByText(/Scenario applied/)).toBeVisible();
+  await page.getByRole("button", { name: "Run readiness check", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Ready for an agent", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Copy agent evaluation prompt", exact: true })
+    .click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain(
+    "CompanySim MCP",
+  );
   await page.getByRole("button", { name: "Search", exact: true }).click();
   await expect(page.getByText("Find anything in your company")).toBeVisible();
   await page.getByLabel("Search company").fill("zzzznonexistentzzzz");

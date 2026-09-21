@@ -12,7 +12,7 @@ Spin up a fictional organization with employees, teams, customers, projects, doc
 
 ![CompanySim company dashboard](docs/screenshots/overview.png)
 
-[Quickstart](#docker-quickstart) · [Connect your agent](#connect-your-agent) · [Screenshots](#a-company-you-can-explore) · [Enrichment](#optional-enrichment) · [Contributing](CONTRIBUTING.md)
+[Quickstart](#docker-quickstart) · [Connect your agent](#connect-your-agent) · [Scenario Lab](#scenario-lab) · [Screenshots](#a-company-you-can-explore) · [Enrichment](#optional-enrichment) · [Contributing](CONTRIBUTING.md)
 
 ## Why CompanySim?
 
@@ -55,6 +55,12 @@ Then ask:
 > Use CompanySim to summarize the company. Find a project, identify the people and customer connected to it, and show the documents that support your answer. Cite the entity IDs.
 
 The Developer screen also includes Claude Code configuration, a downloadable `SKILL.md`, and connection troubleshooting. MCP tools are read-only. A cloud agent cannot reach your machine's localhost directly.
+
+## Scenario Lab
+
+Open **Scenario Lab** after creating a company to apply a controlled delivery-risk, renewal-risk or security-review change. The preview shows every changed field before it is written, and the run creates an auditable `scenario_applied` event in the same SQLite dataset used by REST and MCP.
+
+Save a snapshot before applying a scenario when you want a restore point. After applying it, run the local readiness check and copy its agent prompt into an MCP-connected agent. The check verifies that the scenario records resolve and can be found through CompanySim search; it does not execute or score a third-party agent.
 
 ## Docker quickstart
 
@@ -165,10 +171,11 @@ See [IMPLEMENTATION_NOTES.md](IMPLEMENTATION_NOTES.md) for choices, limits and a
 - **Export:** Settings → Data controls → Export CompanySim JSON. The download includes the configured local API bearer token in its request and contains the round-trip company state, excluding provider credentials.
 - **Enrich:** Settings → choose provider → enter a session key if needed → Refresh models → select model → set Maximum cost and Approximate reserve per job → Test connection → Start enrichment. Watch the generation panel for progress, cancellation and resume. A connection test validates catalog access; it does not run model generation. Reservations are estimates, not guaranteed billing caps.
 - **Agents:** Developer → Copy agent setup prompt. Paste into your local agent to configure MCP, install the included skill if supported, and verify with `get_company` / `get_company_stats`. Download agent skill exports a `SKILL.md` with the current runtime URL. The maintained source template is [docs/skills/companysim/SKILL.md](docs/skills/companysim/SKILL.md); the UI resolves its base URL placeholder. MCP setup examples include Codex CLI and Claude Code project configuration. Existing client configuration must be preserved. Localhost requires an agent running on the same machine; cloud agents cannot reach it directly.
+- **Scenarios:** Scenario Lab → Preview → optionally create a snapshot → Apply to company → Run readiness check. The copied prompt tells an MCP-connected agent to investigate the scenario without mutating the company.
 
 ## Public alpha scope
 
-The alpha supports SaaS/generic company profiles, automatic organization structure, basic actor visibility, keyword search and one-hop relationship expansion. Semantic search, advanced scenario mutation and hosted deployments are roadmap work. AI enrichment changes prose, not the company graph; cost reservations are estimates, not provider billing guarantees.
+The alpha supports SaaS/generic company profiles, automatic organization structure, basic actor visibility, keyword search, one-hop relationship expansion and three controlled scenario mutations. Semantic search, customizable scenario builders and hosted deployments are roadmap work. AI enrichment changes prose, not the company graph; cost reservations are estimates, not provider billing guarantees.
 
 Automated checks cover deterministic generation, reference integrity, persistence, REST/MCP parity, SDK boundaries, model filtering, browser setup/export and Docker. Live provider enrichment was also manually verified by the maintainer. See [implementation notes](IMPLEMENTATION_NOTES.md) for scope and evidence.
 
