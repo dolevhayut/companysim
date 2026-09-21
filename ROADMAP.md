@@ -46,7 +46,9 @@ Do not add many packs until the pack interface is stable.
 
 Status: the first local Scenario Lab is shipped: controlled delivery-risk,
 renewal-risk and security-review mutations, preview diffs, run history, local
-retrieval checks and downloadable test packs.
+retrieval checks and downloadable test packs. Isolated company branches are
+also shipped through the CLI, giving agents and CI jobs independent writable
+SQLite environments derived from one consistent main-company state.
 
 Keep the following work for the next Phase 2 iteration. It is intentionally
 deferred while the current local workflow is being validated.

@@ -55,6 +55,29 @@ try {
   assert.equal(state.state, "completed");
   const before = await (await fetch(base + "/api/v1/people?limit=200")).json();
   assert.equal(before.items.length, 100);
+  const cli = (...args) =>
+    docker(
+      "exec",
+      name,
+      "node",
+      "dist/packages/cli/src/index.js",
+      ...args,
+      "--data-dir",
+      "/data",
+      "--json",
+    );
+  assert.equal(
+    JSON.parse(cli("branch", "create", "docker-agent")).name,
+    "docker-agent",
+  );
+  assert.equal(
+    JSON.parse(cli("status", "--branch", "docker-agent")).counts.person,
+    100,
+  );
+  assert.equal(
+    JSON.parse(cli("branch", "delete", "docker-agent", "--yes")).deleted,
+    true,
+  );
   const client = new Client({ name: "docker-smoke", version: "1" });
   await client.connect(
     new StreamableHTTPClientTransport(new URL(base + "/mcp")),
@@ -87,7 +110,7 @@ try {
   const uid = docker("exec", name, "id", "-u");
   assert.notEqual(uid, "0");
   console.log(
-    "PASS: Docker UI, healthy non-root runtime, volume writes, 100 people, MCP HTTP and restart persistence.",
+    "PASS: Docker UI, healthy non-root runtime, volume writes, isolated branch, 100 people, MCP HTTP and restart persistence.",
   );
 } catch (error) {
   try {

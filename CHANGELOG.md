@@ -25,3 +25,7 @@ Integrated the 21st.dev Model Picker in setup step 04 and provider Settings. Pro
 - Added a copyable agent setup prompt, downloadable CompanySim skill and client-specific MCP guide to the Developer screen. URLs follow the active runtime port. Export downloads now send the configured local bearer token.
 
 - Placed Test connection and Start enrichment together in Settings; enrichment requires a selected model and is disabled during connection testing or active generation.
+
+### Phase 2 foundations
+
+- Added isolated company branches for agent, pull-request and CI experiments. `company branch create|list|delete` manages consistent SQLite copies, and all existing commands can target one with `--branch NAME`. Branches preserve main state, reject unsafe names and symlink targets, respect runtime locks on deletion, and never copy session-only provider credentials.

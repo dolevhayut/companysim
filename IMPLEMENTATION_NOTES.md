@@ -11,6 +11,7 @@
 - Both provider SDKs are isolated behind TextProvider. Model selection is explicit. Unknown current model prices cannot support an honest exact dollar estimate, so enrichment requires a positive user-provided per-job cost reservation. This approximate policy is persisted and enforced before requests; it is not a provider billing ceiling.
 - Environment keys take precedence over in-memory session keys. Provider errors deliberately discard upstream text. Provider-generated prose is redacted before storage.
 - No production registry image or npm package is published. Docker quickstart builds a local image. The source directory initially had no Git repository, so no commits are invented.
+- Company branches live under `<data-dir>/branches/<name>` and are created with Node's SQLite online backup API. Each has an independent database and runtime lock plus a small manifest containing its source company and canonical entity hash. Snapshots remain local to their environment, and in-memory provider credentials are never copied. Branch deletion validates names, rejects symlinks and refuses to proceed while the branch runtime is active.
 
 ## Acceptance evidence
 
@@ -36,11 +37,17 @@ The prior approval-review availability blocker is resolved. After the 21st.dev U
 - Updated static UI assets were applied to the running `companysim-manual` container without restarting its process or touching the `/data` volume. The local Docker image was also rebuilt for future runs.
 - Live provider enrichment was subsequently reported working by the maintainer on 2026-09-21; this is user-reported manual verification, not an automated provider test. Official SDK request/response boundaries, failures, retries/resume, budget reservations and secret isolation pass deterministic tests.
 
+### Phase 2 branch verification
+
+- The full 16-test acceptance suite, strict typecheck, ESLint and production build pass with branch support.
+- CLI acceptance creates a branch, mutates it independently, proves main is unchanged, rejects deletion while the branch lock is active, then deletes it.
+- Docker smoke creates and inspects a branch while the main HTTP/MCP runtime is live, then verifies normal restart persistence. The existing `companysim-manual` container was not restarted.
+
 Docker restart testing also exposed that dynamically allocated host ports can change on restart; the smoke runner now refreshes that mapping. Shutdown closes HTTP connections, and Linux lock identities include process start time and kernel boot ID so stale PID 1 locks cannot block a restarted container.
 
 ## Scope limits
 
-The alpha ships a SaaS/generic profile, one promotion mechanism, simple visibility rules and deterministic one-hop search expansion. Advanced scenario mutation, semantic embeddings, cloud hosting and Deep mode remain roadmap work. Structural UI settings use automatic departments and teams. Content enrichment must be started explicitly after structural generation.
+The alpha ships a SaaS/generic profile, one promotion mechanism, simple visibility rules, deterministic one-hop search expansion, three controlled scenarios and isolated CLI-selected company branches. Custom scenario packs, semantic embeddings, cloud hosting and Deep mode remain roadmap work. Structural UI settings use automatic departments and teams. Content enrichment must be started explicitly after structural generation.
 
 ### Final UI component polish
 

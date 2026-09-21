@@ -146,6 +146,24 @@ restore
 delete
 ```
 
+### `company branch`
+
+Creates isolated, writable copies of the main company for agents, pull
+requests and experiments.
+
+```bash
+company branch create pr-184
+company branch list --json
+company status --branch pr-184
+company serve --branch pr-184 --port 4546
+company branch delete pr-184 --yes
+```
+
+Branches use SQLite's online backup API, so each branch starts from one
+consistent main-company state. Branch metadata records the source company and
+canonical hash. Provider credentials and main-company snapshots are not
+copied. Deleting a branch must fail while its runtime holds the branch lock.
+
 ### `company reset`
 
 ```bash
@@ -246,6 +264,7 @@ CI:
 
 ```bash
 company create testco --mode lite --seed 42 --yes
+company branch create test-run-$CI_JOB_ID
 company serve --no-ui &
 ```
 

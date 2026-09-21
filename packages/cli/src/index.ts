@@ -16,6 +16,12 @@ import { parse, stringify } from "yaml";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { backup, DatabaseSync } from "node:sqlite";
 import { Database } from "../../database/src/index.js";
+import {
+  companyBranchPath,
+  createCompanyBranch,
+  deleteCompanyBranch,
+  listCompanyBranches,
+} from "../../database/src/branches.js";
 import { Services } from "../../core/src/index.js";
 import { startServer, lock } from "../../server/src/index.js";
 import { createMcp } from "../../mcp/src/index.js";
@@ -47,6 +53,7 @@ const stringFlags = [
   "output",
   "format",
   "snapshot",
+  "branch",
 ];
 const boolFlags = [
   "yes",
@@ -86,7 +93,7 @@ async function main() {
   }
   if (v.help || !command) {
     out(
-      "CompanySim — Spin up an entire company on your machine.\nCommands: init, create, generate, serve, status, inspect, search, snapshot, restore, reset, provider, doctor, export, import, mcp\nUse --data-dir PATH, --json, --yes for automation. Native server defaults to 127.0.0.1:4545.\nEnrichment requires --provider, --model, --max-cost and --cost-per-job (approximate budget reservation).",
+      "CompanySim — Spin up an entire company on your machine.\nCommands: init, create, generate, serve, status, inspect, search, snapshot, branch, restore, reset, provider, doctor, export, import, mcp\nUse --data-dir PATH, --branch NAME, --json, --yes for automation. Native server defaults to 127.0.0.1:4545.\nEnrichment requires --provider, --model, --max-cost and --cost-per-job (approximate budget reservation).",
     );
     return;
   }
@@ -99,7 +106,7 @@ async function main() {
         Record<string, unknown>
       >)
     : {};
-  const dir = resolve(
+  const baseDir = resolve(
     text("data-dir") ??
       process.env.COMPANYSIM_DATA_DIR ??
       String(
@@ -107,6 +114,10 @@ async function main() {
           join(homedir(), ".local", "share", "companysim"),
       ),
   );
+  const selectedBranch = text("branch");
+  const dir = selectedBranch
+    ? companyBranchPath(baseDir, selectedBranch)
+    : baseDir;
   const host = text("host") ?? String(raw.runtime?.host ?? "127.0.0.1"),
     port = Number(text("port") ?? raw.runtime?.port ?? 4545);
   const confirm = async (message: string) => {
@@ -125,6 +136,50 @@ async function main() {
     if (answer.toLowerCase() !== "y")
       throw new AppError("CANCELLED", "Cancelled.");
   };
+  if (command === "branch") {
+    const action = p[1] ?? "list";
+    if (action === "list") {
+      out(listCompanyBranches(baseDir));
+      return;
+    }
+    const name = p[2] ?? "";
+    if (action === "create") {
+      if (!existsSync(join(baseDir, "company.db")))
+        throw new AppError(
+          "NOT_INITIALIZED",
+          "Create the main company before creating a branch.",
+          404,
+        );
+      const source = new Database(baseDir);
+      try {
+        new Services(source).company();
+        out(await createCompanyBranch(source.sql, baseDir, name));
+      } finally {
+        source.close();
+      }
+      return;
+    }
+    if (action === "delete") {
+      await confirm(`Delete branch ${name}?`);
+      const branchDir = companyBranchPath(baseDir, name);
+      if (!existsSync(join(branchDir, "company.db")))
+        throw new AppError("ENTITY_NOT_FOUND", "Branch was not found.", 404);
+      const releaseBranch = lock(branchDir);
+      try {
+        out(deleteCompanyBranch(baseDir, name));
+      } finally {
+        releaseBranch();
+      }
+      return;
+    }
+    throw new AppError("VALIDATION", "Unknown branch command.");
+  }
+  if (selectedBranch && !existsSync(join(dir, "company.db")))
+    throw new AppError(
+      "ENTITY_NOT_FOUND",
+      `Branch ${selectedBranch} was not found.`,
+      404,
+    );
   if (command === "init") {
     let name = "Acme";
     if (!v.yes && process.stdin.isTTY) {

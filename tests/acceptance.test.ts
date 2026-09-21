@@ -11,7 +11,7 @@ import { Services } from "../packages/core/src/index.js";
 import { Providers } from "../packages/providers/src/index.js";
 import { generate, hash, validate } from "../packages/generator/src/index.js";
 import { createRest } from "../packages/rest/src/index.js";
-import { startServer } from "../packages/server/src/index.js";
+import { startServer, lock } from "../packages/server/src/index.js";
 const dirs: string[] = [];
 const dbs: Database[] = [];
 function directory() {
@@ -157,7 +157,9 @@ describe("CompanySim public alpha acceptance", () => {
     const preview = await (
       await app.request("/api/control/scenarios/delivery-risk/preview")
     ).json();
-    expect(preview.changes.some((change: { entityId?: string }) => change.entityId)).toBe(true);
+    expect(
+      preview.changes.some((change: { entityId?: string }) => change.entityId),
+    ).toBe(true);
     const applied = await (
       await app.request("/api/control/scenarios/delivery-risk/apply", {
         method: "POST",
@@ -251,6 +253,43 @@ describe("CompanySim public alpha acceptance", () => {
     expect(JSON.parse(create.stdout).name).toBe("testco");
     const status = cli("status", "--json");
     expect(JSON.parse(status.stdout).counts.person).toBe(50);
+    const branch = cli("branch", "create", "agent-run", "--json");
+    expect(branch.status, branch.stderr).toBe(0);
+    expect(JSON.parse(branch.stdout).name).toBe("agent-run");
+    expect(
+      JSON.parse(cli("branch", "list", "--json").stdout)[0].canonicalHash,
+    ).toBeTruthy();
+    const changedBranch = cli(
+      "create",
+      "branchco",
+      "--employees",
+      "3",
+      "--force",
+      "--yes",
+      "--branch",
+      "agent-run",
+      "--json",
+    );
+    expect(changedBranch.status, changedBranch.stderr).toBe(0);
+    expect(
+      JSON.parse(cli("status", "--branch", "agent-run", "--json").stdout)
+        .company.name,
+    ).toBe("branchco");
+    expect(JSON.parse(cli("status", "--json").stdout).company.name).toBe(
+      "testco",
+    );
+    const releaseBranch = lock(join(dir, "branches", "agent-run"));
+    try {
+      expect(
+        cli("branch", "delete", "agent-run", "--yes", "--json").status,
+      ).not.toBe(0);
+    } finally {
+      releaseBranch();
+    }
+    expect(cli("branch", "delete", "agent-run", "--yes", "--json").status).toBe(
+      0,
+    );
+    expect(cli("status", "--branch", "agent-run", "--json").status).not.toBe(0);
     expect(
       JSON.parse(cli("doctor", "--json", "--port", "0").stdout).databasePresent,
     ).toBe(true);

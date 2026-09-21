@@ -101,6 +101,8 @@ pnpm company inspect person PERSON_ID --json
 pnpm company search "Atlas Migration" --limit 20
 pnpm company snapshot create baseline
 pnpm company snapshot restore baseline --yes
+pnpm company branch create agent-run
+pnpm company status --branch agent-run --json
 pnpm company doctor --json
 pnpm company export --format json --output company-export.json
 pnpm company import company-export.json --yes
@@ -112,6 +114,19 @@ Use `--data-dir PATH` on every command to target an explicit environment. Defaul
 After `pnpm build`, `npm pack` creates an installable CLI package with `company` and `companysim` aliases. Install the tarball with `npm install -g ./companysim-0.1.0-alpha.1.tgz`.
 
 JSON is the complete, versioned, round-trip export (including job progress); SQLite export is also importable. JSONL and CSV exports contain entity rows for analysis, not full environment backups.
+
+### Isolated company branches
+
+Create a writable company copy before giving an agent or CI job permission to mutate state:
+
+```sh
+pnpm company branch create pr-184
+pnpm company serve --branch pr-184 --port 4546
+pnpm company branch list --json
+pnpm company branch delete pr-184 --yes
+```
+
+The branch starts from a consistent SQLite backup of main and then evolves independently. Every existing command accepts `--branch NAME`, including `serve`, `mcp`, `status`, scenarios, snapshots and enrichment. Branches do not copy provider credentials or main-company snapshot files.
 
 ## REST and MCP
 
