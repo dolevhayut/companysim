@@ -44,7 +44,28 @@ Do not add many packs until the pack interface is stable.
 
 ## Phase 2 — Scenario engine
 
-Add explicit state mutations:
+Status: the first local Scenario Lab is shipped: controlled delivery-risk,
+renewal-risk and security-review mutations, preview diffs, run history, local
+retrieval checks and downloadable test packs.
+
+Keep the following work for the next Phase 2 iteration. It is intentionally
+deferred while the current local workflow is being validated.
+
+### Scenario packs as code
+
+Version scenario packs in Git. A pack should contain a deterministic seed,
+scenario inputs, expected facts, assertions and an agent task prompt.
+
+```text
+companysim scenario run churn-risk --seed demo-42
+companysim eval run support-agent --scenario churn-risk
+```
+
+This makes test worlds reviewable and repeatable in local development and CI.
+
+### Connected scenario mutations
+
+Expand explicit state mutations:
 
 ```text
 employee offboarding
@@ -68,6 +89,24 @@ Example employee departure:
 - permissions change,
 - handover document appears,
 - related tickets/messages/events appear.
+
+### Agent evaluation runner
+
+Turn the existing retrieval check into a repeatable evaluator that records:
+
+- grounded answer quality and cited entity IDs,
+- tool-use and write-policy compliance,
+- expected facts found or missed,
+- latency and cost when supplied by the client.
+
+The runner must score an agent's supplied trace or response; it must never
+claim to have executed an external agent itself.
+
+### Product adapters and event simulation
+
+Add adapters that map a CompanySim world into a product's REST, OpenAPI,
+Prisma/Postgres, GraphQL or webhook boundary. Add a deterministic event stream
+for state changes such as tickets, renewals, role moves and outages.
 
 ## Phase 3 — Simulation clock
 
