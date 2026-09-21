@@ -182,6 +182,21 @@ company scenario run ./companysim-delivery-risk-test-pack.json --branch agent-ru
 `run` refuses stale packs instead of silently overwriting changed state. JSON
 and YAML packs are accepted. Run packs on an isolated branch when possible.
 
+### `company eval`
+
+Create a portable trace template, then score a completed agent run:
+
+```bash
+company eval template ./scenario-pack.json --branch agent-run --json
+company eval run ./scenario-pack.json ./agent-run.json --branch agent-run --json
+```
+
+The deterministic scorecard checks that the scenario's after-state exists,
+the agent loaded company context, used CompanySim search, cited every target
+entity ID and used only known read-only CompanySim MCP tools. Optional latency
+and cost supplied by the client are preserved as metrics. CompanySim does not
+claim to execute or judge an external agent with an LLM.
+
 ### `company reset`
 
 ```bash

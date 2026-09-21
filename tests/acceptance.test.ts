@@ -327,6 +327,52 @@ describe("CompanySim public alpha acceptance", () => {
         cli("scenario", "list", "--branch", "agent-run", "--json").stdout,
       ).history,
     ).toHaveLength(1);
+    const runTemplate = JSON.parse(
+      cli("eval", "template", packPath, "--branch", "agent-run", "--json")
+        .stdout,
+    );
+    const runPath = join(dir, "agent-run.json");
+    writeFileSync(
+      runPath,
+      JSON.stringify({
+        ...runTemplate,
+        answer: `Investigated ${evaluated.scenario.targets
+          .map((target: { id: string }) => target.id)
+          .join(" ")}`,
+        toolCalls: [
+          { name: "mcp__companysim__get_company", arguments: {} },
+          {
+            name: "mcp__companysim__search_company",
+            arguments: { query: "delivery risk" },
+          },
+        ],
+        metrics: { latencyMs: 1200, costUsd: 0.01 },
+      }),
+    );
+    const scorecard = JSON.parse(
+      cli("eval", "run", packPath, runPath, "--branch", "agent-run", "--json")
+        .stdout,
+    );
+    expect(scorecard).toMatchObject({ passed: true, score: 100 });
+    expect(scorecard.metrics.costUsd).toBe(0.01);
+    writeFileSync(
+      runPath,
+      JSON.stringify({
+        ...runTemplate,
+        answer: "Unverified answer",
+        toolCalls: [{ name: "reset_company", arguments: {} }],
+      }),
+    );
+    const unsafeScorecard = JSON.parse(
+      cli("eval", "run", packPath, runPath, "--branch", "agent-run", "--json")
+        .stdout,
+    );
+    expect(unsafeScorecard.passed).toBe(false);
+    expect(
+      unsafeScorecard.checks.find(
+        (check: { id: string }) => check.id === "read_only",
+      ).passed,
+    ).toBe(false);
     expect(
       JSON.parse(cli("scenario", "list", "--json").stdout).history,
     ).toHaveLength(0);

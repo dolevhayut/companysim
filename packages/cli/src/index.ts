@@ -93,7 +93,7 @@ async function main() {
   }
   if (v.help || !command) {
     out(
-      "CompanySim — Spin up an entire company on your machine.\nCommands: init, create, generate, serve, status, inspect, search, snapshot, scenario, branch, restore, reset, provider, doctor, export, import, mcp\nUse --data-dir PATH, --branch NAME, --json, --yes for automation. Native server defaults to 127.0.0.1:4545.\nEnrichment requires --provider, --model, --max-cost and --cost-per-job (approximate budget reservation).",
+      "CompanySim — Spin up an entire company on your machine.\nCommands: init, create, generate, serve, status, inspect, search, snapshot, scenario, eval, branch, restore, reset, provider, doctor, export, import, mcp\nUse --data-dir PATH, --branch NAME, --json, --yes for automation. Native server defaults to 127.0.0.1:4545.\nEnrichment requires --provider, --model, --max-cost and --cost-per-job (approximate budget reservation).",
     );
     return;
   }
@@ -135,6 +135,12 @@ async function main() {
     rl.close();
     if (answer.toLowerCase() !== "y")
       throw new AppError("CANCELLED", "Cancelled.");
+  };
+  const loadStructuredFile = (path: string, label: string) => {
+    if (!existsSync(path))
+      throw new AppError("ENTITY_NOT_FOUND", `${label} was not found.`, 404);
+    const content = readFileSync(path, "utf8");
+    return /\.ya?ml$/i.test(path) ? parse(content) : JSON.parse(content);
   };
   if (command === "branch") {
     const action = p[1] ?? "list";
@@ -382,23 +388,27 @@ async function main() {
         else if (action === "evaluate") out(s.evaluateScenario(p[2] ?? ""));
         else if (action === "apply") out(s.applyScenario(p[2] ?? ""));
         else if (["validate", "run"].includes(action)) {
-          const path = p[2] ?? "";
-          if (!existsSync(path))
-            throw new AppError(
-              "ENTITY_NOT_FOUND",
-              "Scenario pack was not found.",
-              404,
-            );
-          const content = readFileSync(path, "utf8");
-          const pack = /\.ya?ml$/i.test(path)
-            ? parse(content)
-            : JSON.parse(content);
+          const pack = loadStructuredFile(p[2] ?? "", "Scenario pack");
           out(
             action === "validate"
               ? s.validateScenarioPack(pack)
               : s.applyScenarioPack(pack),
           );
         } else throw new AppError("VALIDATION", "Unknown scenario command.");
+        break;
+      }
+      case "eval": {
+        const action = p[1] ?? "run";
+        const pack = loadStructuredFile(p[2] ?? "", "Scenario pack");
+        if (action === "template") out(s.agentRunTemplate(pack));
+        else if (action === "run")
+          out(
+            s.evaluateAgentRun(
+              pack,
+              loadStructuredFile(p[3] ?? "", "Agent run"),
+            ),
+          );
+        else throw new AppError("VALIDATION", "Unknown eval command.");
         break;
       }
       case "export": {

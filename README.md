@@ -137,6 +137,15 @@ pnpm company scenario run ./companysim-delivery-risk-test-pack.json --branch pr-
 
 Validation checks that every target still exists and matches the baseline captured in the pack. A stale pack fails before any changes are written. Packs can therefore live beside tests in Git and run against short-lived branches in CI.
 
+To score an agent run without a provider dependency, generate a trace template and fill it with the agent's final answer and MCP tool calls:
+
+```sh
+pnpm company eval template ./companysim-delivery-risk-test-pack.json --branch pr-184 --json
+pnpm company eval run ./companysim-delivery-risk-test-pack.json ./agent-run.json --branch pr-184 --json
+```
+
+The scorecard is deterministic: it verifies scenario state, required company/search calls, cited target IDs and read-only tool use. Client-reported latency and cost pass through as evidence.
+
 ## REST and MCP
 
 - REST: `http://localhost:4545/api/v1`

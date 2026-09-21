@@ -99,6 +99,11 @@ Example employee departure:
 
 ### Agent evaluation runner
 
+Status: the first provider-independent CLI runner accepts a portable answer
+and MCP tool trace, then emits a deterministic scorecard for scenario state,
+company/search tool use, entity-ID grounding and read-only compliance. Future
+iterations should add richer pack assertions and signed traces.
+
 Turn the existing retrieval check into a repeatable evaluator that records:
 
 - grounded answer quality and cited entity IDs,

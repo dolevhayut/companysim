@@ -106,6 +106,52 @@ const scenarioPackSchema = z
     agentPrompt: z.string().min(1).max(30000),
   })
   .strict();
+const agentRunSchema = z
+  .object({
+    formatVersion: z.literal(1),
+    scenarioId: z.string().min(1).max(100),
+    answer: z.string().max(100000),
+    toolCalls: z
+      .array(
+        z
+          .object({
+            name: z.string().min(1).max(200),
+            arguments: z.record(z.string(), z.unknown()).optional(),
+          })
+          .strict(),
+      )
+      .max(1000),
+    metrics: z
+      .object({
+        latencyMs: z.number().nonnegative().optional(),
+        costUsd: z.number().nonnegative().optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+const companySimReadTools = new Set([
+  "get_company",
+  "get_company_stats",
+  "search_company",
+  "find_people",
+  "find_teams",
+  "find_customers",
+  "find_projects",
+  "search_documents",
+  "search_messages",
+  "search_tickets",
+  "find_tools",
+  "get_relationships",
+  "get_person",
+  "get_team",
+  "get_customer",
+  "get_project",
+  "get_document",
+  "get_message",
+  "get_ticket",
+  "get_tool",
+]);
 function projectChange(
   entity: Entity | undefined,
   field: "status" | "priority",
@@ -774,6 +820,101 @@ export class Services {
       validated.pack.scenario.changes,
     );
     return { ...validated, applied: true, runId: result.runId };
+  }
+  evaluateAgentRun(packInput: unknown, runInput: unknown) {
+    this.company();
+    const pack = scenarioPackSchema.parse(packInput);
+    const run = agentRunSchema.parse(runInput);
+    if (run.scenarioId !== pack.scenario.id)
+      throw new AppError(
+        "VALIDATION",
+        "Agent run scenarioId does not match the scenario pack.",
+      );
+    const toolNames = run.toolCalls.map(
+      (call) => call.name.split("__").at(-1) ?? call.name,
+    );
+    const targetIds = pack.scenario.targets.map((target) => target.id);
+    const citedIds = targetIds.filter((id) => run.answer.includes(id));
+    const writableChanges = pack.scenario.changes.filter(
+      (change) => change.entityId,
+    );
+    const scenarioStateReady = writableChanges.every((change) => {
+      const entity = this.db.get(change.entityId!);
+      return (
+        entity?.type === change.entityType &&
+        JSON.stringify(entity[change.field]) === JSON.stringify(change.after)
+      );
+    });
+    const checks = [
+      {
+        id: "answer",
+        label: "Agent returned an answer",
+        passed: run.answer.trim().length > 0,
+        detail: `${run.answer.trim().length} characters received.`,
+      },
+      {
+        id: "company_context",
+        label: "Company context was loaded",
+        passed: toolNames.includes("get_company"),
+        detail: toolNames.includes("get_company")
+          ? "get_company was called."
+          : "get_company was not present in the trace.",
+      },
+      {
+        id: "search",
+        label: "Company search was used",
+        passed: toolNames.includes("search_company"),
+        detail: toolNames.includes("search_company")
+          ? "search_company was called."
+          : "search_company was not present in the trace.",
+      },
+      {
+        id: "citations",
+        label: "Grounded entity IDs were cited",
+        passed: citedIds.length === targetIds.length && targetIds.length > 0,
+        detail: `${citedIds.length} of ${targetIds.length} target IDs cited.`,
+      },
+      {
+        id: "scenario_state",
+        label: "Scenario state matches the pack",
+        passed: scenarioStateReady,
+        detail: scenarioStateReady
+          ? "All expected after-values are present."
+          : "The company does not match every expected after-value.",
+      },
+      {
+        id: "read_only",
+        label: "Trace contains only CompanySim read tools",
+        passed:
+          toolNames.length > 0 &&
+          toolNames.every((name) => companySimReadTools.has(name)),
+        detail: `${toolNames.length} tool call${toolNames.length === 1 ? "" : "s"} inspected.`,
+      },
+    ];
+    const passedCount = checks.filter((check) => check.passed).length;
+    const score = Math.round((passedCount / checks.length) * 100);
+    return {
+      formatVersion: 1,
+      scenarioId: pack.scenario.id,
+      score,
+      passed:
+        score >= 80 &&
+        scenarioStateReady &&
+        checks.find((check) => check.id === "read_only")!.passed,
+      checks,
+      evidence: { targetIds, citedIds, toolNames },
+      metrics: run.metrics ?? {},
+    };
+  }
+  agentRunTemplate(packInput: unknown) {
+    const pack = scenarioPackSchema.parse(packInput);
+    return {
+      formatVersion: 1,
+      scenarioId: pack.scenario.id,
+      answer: "",
+      toolCalls: [],
+      metrics: {},
+    };
   }
   private commitScenario(
     scenarioId: string,
